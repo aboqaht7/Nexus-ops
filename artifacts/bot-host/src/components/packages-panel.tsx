@@ -1,6 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { PackageSearch, Loader2, CheckCircle2, XCircle, TerminalSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -38,7 +36,7 @@ export function PackagesPanel({ botId, language }: PackagesPanelProps) {
 
     setInstalling(true);
     setLastStatus(null);
-    setLines([{ type: "stdout", text: `Installing "${pkg.trim()}" with ${manager}...` }]);
+    setLines([{ type: "stdout", text: `جاري تثبيت "${pkg.trim()}" عبر ${manager}...` }]);
 
     const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
     const resp = await fetch(`${BASE}/api/bots/${botId}/packages/install`, {
@@ -49,7 +47,7 @@ export function PackagesPanel({ botId, language }: PackagesPanelProps) {
     }).catch(() => null);
 
     if (!resp || !resp.body) {
-      setLines((p) => [...p, { type: "error", text: "Connection failed" }]);
+      setLines(p => [...p, { type: "error", text: "فشل الاتصال بالخادم" }]);
       setInstalling(false);
       setLastStatus("fail");
       return;
@@ -70,10 +68,9 @@ export function PackagesPanel({ botId, language }: PackagesPanelProps) {
         if (!dataLine) continue;
         try {
           const msg: LogLine = JSON.parse(dataLine);
-          setLines((p) => [...p, msg]);
+          setLines(p => [...p, msg]);
           if (msg.type === "done") {
-            const ok = msg.text.includes("code 0");
-            setLastStatus(ok ? "ok" : "fail");
+            setLastStatus(msg.text.includes("code 0") ? "ok" : "fail");
           }
         } catch {}
       }
@@ -83,67 +80,65 @@ export function PackagesPanel({ botId, language }: PackagesPanelProps) {
   };
 
   return (
-    <div className="h-full flex flex-col bg-[#0c0c0e]">
-      {/* Install bar */}
-      <div className="flex gap-2 p-3 border-b border-white/5 flex-shrink-0">
-        <div className="flex-1 relative">
-          <PackageSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
-          <Input
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "#010409" }}>
+      {/* شريط التثبيت */}
+      <div style={{ display: "flex", gap: 8, padding: 12, borderBottom: "1px solid #30363D", flexShrink: 0 }}>
+        <div style={{ flex: 1, position: "relative" }}>
+          <PackageSearch style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: "#484F58" }} />
+          <input
             value={pkg}
-            onChange={(e) => setPkg(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && install()}
+            onChange={e => setPkg(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && install()}
             placeholder={manager === "npm" ? "discord.js, axios, dayjs…" : "discord.py, requests…"}
-            className="h-7 text-xs pl-8 bg-zinc-900 border-zinc-800 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-primary/30"
+            style={{ width: "100%", height: 30, fontSize: 12, fontFamily: "'JetBrains Mono','Cairo',monospace", background: "#161B22", border: "1px solid #30363D", borderRadius: 6, padding: "0 34px 0 10px", color: "#E6EDF3", outline: "none", boxSizing: "border-box" }}
+            onFocus={e => (e.currentTarget.style.borderColor = "#F26207")}
+            onBlur={e => (e.currentTarget.style.borderColor = "#30363D")}
           />
         </div>
-        <Button
-          size="sm"
-          className="h-7 px-3 text-xs gap-1.5 shrink-0"
+        <button
           onClick={install}
           disabled={installing || !pkg.trim()}
+          style={{ display: "flex", alignItems: "center", gap: 5, padding: "0 12px", height: 30, fontSize: 12, fontWeight: 600, fontFamily: "'Cairo','Inter',sans-serif", borderRadius: 6, border: "none", background: installing || !pkg.trim() ? "#21262D" : "#F26207", color: installing || !pkg.trim() ? "#484F58" : "#fff", cursor: installing || !pkg.trim() ? "not-allowed" : "pointer", flexShrink: 0, whiteSpace: "nowrap" }}
         >
-          {installing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <TerminalSquare className="w-3.5 h-3.5" />}
-          {installing ? "Installing…" : `Install via ${manager}`}
-        </Button>
+          {installing ? <Loader2 style={{ width: 12, height: 12, animation: "spin .8s linear infinite" }} /> : <TerminalSquare style={{ width: 12, height: 12 }} />}
+          {installing ? "جاري التثبيت…" : `تثبيت عبر ${manager}`}
+        </button>
       </div>
 
-      {/* Output */}
-      <ScrollArea className="flex-1">
-        <div className="p-3 font-mono text-xs space-y-0.5">
-          {lines.length === 0 && (
-            <p className="text-zinc-600 py-6 text-center text-[11px]">
-              Enter a package name to install it.
-            </p>
-          )}
-          {lines.map((l, i) => (
-            <div
-              key={i}
-              className={cn(
-                "leading-5 whitespace-pre-wrap break-all",
-                l.type === "stderr" && "text-amber-400/80",
-                l.type === "error" && "text-red-400",
-                l.type === "done" && "text-zinc-500",
-                l.type === "stdout" && "text-zinc-300"
-              )}
-            >
-              {l.text}
-            </div>
-          ))}
-          {lastStatus === "ok" && (
-            <div className="flex items-center gap-1.5 text-emerald-400 mt-1 pt-1 border-t border-white/5">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Installed successfully. Restart bot to use it.</span>
-            </div>
-          )}
-          {lastStatus === "fail" && (
-            <div className="flex items-center gap-1.5 text-red-400 mt-1 pt-1 border-t border-white/5">
-              <XCircle className="w-3.5 h-3.5" />
-              <span>Installation failed.</span>
-            </div>
-          )}
-          <div ref={scrollRef} />
-        </div>
-      </ScrollArea>
+      {/* مخرجات التثبيت */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "10px 12px" }}>
+        {lines.length === 0 && (
+          <p style={{ textAlign: "center", color: "#484F58", fontSize: 12, padding: "40px 0", fontFamily: "'JetBrains Mono',monospace" }}>
+            اكتب اسم الحزمة لتثبيتها
+          </p>
+        )}
+        {lines.map((l, i) => (
+          <div
+            key={i}
+            style={{
+              fontSize: 12, fontFamily: "'JetBrains Mono',monospace", lineHeight: "20px",
+              whiteSpace: "pre-wrap", wordBreak: "break-all",
+              color: l.type === "stderr" ? "#D29922" : l.type === "error" ? "#F85149" : l.type === "done" ? "#484F58" : "#ABB2BF",
+            }}
+          >
+            {l.text}
+          </div>
+        ))}
+        {lastStatus === "ok" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#3FB950", marginTop: 8, paddingTop: 8, borderTop: "1px solid #21262D", fontSize: 12, fontFamily: "'Cairo','Inter',sans-serif" }}>
+            <CheckCircle2 style={{ width: 13, height: 13 }} />
+            تم التثبيت بنجاح. أعِد تشغيل البوت لتطبيق التغييرات.
+          </div>
+        )}
+        {lastStatus === "fail" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#F85149", marginTop: 8, paddingTop: 8, borderTop: "1px solid #21262D", fontSize: 12, fontFamily: "'Cairo','Inter',sans-serif" }}>
+            <XCircle style={{ width: 13, height: 13 }} />
+            فشل التثبيت. تحقق من اسم الحزمة وحاول مجدداً.
+          </div>
+        )}
+        <div ref={scrollRef} />
+      </div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }

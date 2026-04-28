@@ -25,8 +25,8 @@ import { Github, Loader2, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const schema = z.object({
-  repoUrl: z.string().url("Enter a valid GitHub URL").min(1, "Repo URL is required"),
-  token: z.string().min(1, "GitHub token is required"),
+  repoUrl: z.string().url("أدخل رابط GitHub صحيحاً").min(1, "رابط المستودع مطلوب"),
+  token: z.string().min(1, "رمز GitHub مطلوب"),
   path: z.string().optional(),
   commitMessage: z.string().optional(),
 });
@@ -51,7 +51,7 @@ export function ExportGithubDialog({ botId, botName, botFilename }: ExportGithub
       repoUrl: "",
       token: "",
       path: botFilename,
-      commitMessage: `Update ${botName} via NexusOps`,
+      commitMessage: `تحديث ${botName} عبر NexusOps`,
     },
   });
 
@@ -68,31 +68,31 @@ export function ExportGithubDialog({ botId, botName, botFilename }: ExportGithub
         },
       },
       {
-        onSuccess: (result) => {
-          toast({ title: "Exported to GitHub", description: result.message });
+        onSuccess: result => {
+          toast({ title: "✓ تم الرفع إلى GitHub", description: result.message });
           if (result.url) setResultUrl(result.url);
         },
         onError: (e: unknown) => {
-          toast({ title: "Export failed", description: (e as Error).message, variant: "destructive" });
+          toast({ title: "فشل الرفع", description: (e as Error).message, variant: "destructive" });
         },
       }
     );
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setResultUrl(null); }}>
+    <Dialog open={open} onOpenChange={v => { setOpen(v); if (!v) setResultUrl(null); }}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="sm" className="gap-1.5 px-2 text-muted-foreground hover:text-foreground">
           <Github className="w-3.5 h-3.5" />
-          Push
+          رفع
         </Button>
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Export to GitHub</DialogTitle>
+          <DialogTitle>رفع إلى GitHub</DialogTitle>
           <DialogDescription>
-            Push <span className="font-mono text-primary">{botFilename}</span> to a GitHub repository.
+            ارفع <span className="font-mono text-primary">{botFilename}</span> إلى مستودع GitHub.
           </DialogDescription>
         </DialogHeader>
 
@@ -103,7 +103,7 @@ export function ExportGithubDialog({ botId, botName, botFilename }: ExportGithub
               name="repoUrl"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Repository URL</FormLabel>
+                  <FormLabel>رابط المستودع</FormLabel>
                   <FormControl>
                     <Input placeholder="https://github.com/user/my-bot" {...field} />
                   </FormControl>
@@ -117,7 +117,7 @@ export function ExportGithubDialog({ botId, botName, botFilename }: ExportGithub
               name="token"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>GitHub Personal Access Token</FormLabel>
+                  <FormLabel>رمز الوصول الشخصي لـ GitHub</FormLabel>
                   <FormControl>
                     <Input type="password" placeholder="ghp_xxxxxxxxxxxx" {...field} />
                   </FormControl>
@@ -132,7 +132,7 @@ export function ExportGithubDialog({ botId, botName, botFilename }: ExportGithub
                 name="path"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Destination Path</FormLabel>
+                    <FormLabel>مسار الوجهة</FormLabel>
                     <FormControl>
                       <Input placeholder="bot/index.js" {...field} />
                     </FormControl>
@@ -145,9 +145,9 @@ export function ExportGithubDialog({ botId, botName, botFilename }: ExportGithub
                 name="commitMessage"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Commit Message</FormLabel>
+                    <FormLabel>رسالة الـ Commit</FormLabel>
                     <FormControl>
-                      <Input placeholder="Update bot" {...field} />
+                      <Input placeholder="تحديث البوت" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -163,13 +163,13 @@ export function ExportGithubDialog({ botId, botName, botFilename }: ExportGithub
                 className="flex items-center gap-2 text-sm text-primary hover:underline"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
-                View on GitHub
+                عرض على GitHub
               </a>
             )}
 
             <Button type="submit" disabled={exportToGithub.isPending} className="w-full">
-              {exportToGithub.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {exportToGithub.isPending ? "Pushing..." : "Push to GitHub"}
+              {exportToGithub.isPending && <Loader2 className="w-4 h-4 ml-2 animate-spin" />}
+              {exportToGithub.isPending ? "جاري الرفع..." : "رفع إلى GitHub"}
             </Button>
           </form>
         </Form>

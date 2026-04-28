@@ -395,7 +395,7 @@ export default function Home() {
                   fontSize: 11, fontWeight: 700, letterSpacing: "0.06em",
                   padding: "3px 10px", borderRadius: 99, marginBottom: 14,
                 }}>
-                  MOST POPULAR
+                  الأكثر شيوعاً
                 </div>
               )}
               <p style={{ fontSize: 14, fontWeight: 600, color: R.muted, marginBottom: 6 }}>{p.name}</p>
@@ -454,9 +454,9 @@ export default function Home() {
             </div>
             <span style={{ fontWeight: 600, fontSize: 14, color: R.text }}>NexusOps</span>
           </div>
-          <p style={{ fontSize: 13, color: R.muted }}>© 2026 NexusOps — Discord Bot Hosting Platform</p>
+          <p style={{ fontSize: 13, color: R.muted }}>© 2026 NexusOps — منصة استضافة بوتات Discord</p>
           <div style={{ display: "flex", gap: 20 }}>
-            {["Docs", "GitHub", "Discord"].map(l => (
+            {["التوثيق", "GitHub", "Discord"].map(l => (
               <a key={l} href="#" style={{ fontSize: 13, color: R.muted, textDecoration: "none" }}
                 onMouseEnter={e => (e.currentTarget.style.color = R.text)}
                 onMouseLeave={e => (e.currentTarget.style.color = R.muted)}
