@@ -98,8 +98,8 @@ export function UploadBotDialog() {
               )}
             />
             
-            <FormItem>
-              <FormLabel>Source File</FormLabel>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium leading-none">Source File</label>
               <div className="mt-2 flex justify-center rounded-lg border border-dashed border-border px-6 py-8 hover:bg-muted/50 transition-colors">
                 <div className="text-center">
                   <UploadCloud className="mx-auto h-8 w-8 text-muted-foreground" aria-hidden="true" />
@@ -125,7 +125,7 @@ export function UploadBotDialog() {
                   </p>
                 </div>
               </div>
-            </FormItem>
+            </div>
 
             <div className="flex justify-end pt-4">
               <Button type="submit" disabled={isUploading || !file} className="w-full sm:w-auto">
