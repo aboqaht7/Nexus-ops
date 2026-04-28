@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link } from "wouter";
-import { Terminal, Activity, Server, Upload } from "lucide-react";
+import { Activity, Server, Sparkles } from "lucide-react";
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
@@ -17,6 +17,10 @@ export function Layout({ children }: { children: ReactNode }) {
             <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2">
               <Activity className="w-4 h-4" />
               Dashboard
+            </Link>
+            <Link href="/agent" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2">
+              <Sparkles className="w-4 h-4" />
+              Agent-4
             </Link>
             <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-semibold">
               <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />

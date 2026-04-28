@@ -6,6 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./agentDeployBody";
+export * from "./agentDeployBodyLanguage";
+export * from "./anthropicConversation";
+export * from "./anthropicConversationWithMessages";
+export * from "./anthropicError";
+export * from "./anthropicMessage";
 export * from "./bot";
 export * from "./botLanguage";
 export * from "./botLogs";
@@ -20,3 +26,5 @@ export * from "./healthStatus";
 export * from "./importGithubBody";
 export * from "./importResult";
 export * from "./importUrlBody";
+export * from "./newConversationBody";
+export * from "./newMessageBody";

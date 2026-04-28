@@ -99,3 +99,53 @@ export interface ExportGithubResult {
   url?: string;
   message: string;
 }
+
+export interface AnthropicConversation {
+  id: number;
+  title: string;
+  botId?: string | null;
+  createdAt: string;
+}
+
+export interface AnthropicMessage {
+  id: number;
+  conversationId: number;
+  role: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface NewConversationBody {
+  title: string;
+  botId?: string | null;
+}
+
+export interface NewMessageBody {
+  content: string;
+}
+
+export interface AnthropicConversationWithMessages {
+  id: number;
+  title: string;
+  botId?: string | null;
+  createdAt: string;
+  messages: AnthropicMessage[];
+}
+
+export interface AnthropicError {
+  error: string;
+}
+
+export type AgentDeployBodyLanguage =
+  (typeof AgentDeployBodyLanguage)[keyof typeof AgentDeployBodyLanguage];
+
+export const AgentDeployBodyLanguage = {
+  javascript: "javascript",
+  python: "python",
+} as const;
+
+export interface AgentDeployBody {
+  name: string;
+  language: AgentDeployBodyLanguage;
+  code: string;
+}

@@ -11,7 +11,7 @@ Discord Bot Hosting panel — a full-stack monorepo for running Discord bots 24/
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
 - **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM (provisioned but not currently used — bots stored in data/bots.json)
+- **Database**: PostgreSQL + Drizzle ORM (used for Agent-4 conversations/messages; bots stored in data/bots.json)
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
@@ -30,6 +30,23 @@ Discord Bot Hosting panel — a full-stack monorepo for running Discord bots 24/
 - Auto-restart on crash with exponential backoff (max 30s delay)
 - In-memory ring buffer for logs (200 entries per bot)
 - Bots with `autoRestart=true` resume automatically on server restart
+
+## Agent-4 (AI Coding Agent)
+
+- Powered by Anthropic Claude Sonnet via Replit AI Integrations
+- Conversations and messages stored in PostgreSQL (`conversations`, `messages` tables)
+- Streams responses via SSE (`POST /api/anthropic/conversations/:id/messages`)
+- Bot context: conversations can be linked to a bot (reads bot file to give AI context)
+- Deploy endpoint: `POST /api/agent/deploy` creates a new bot from AI-generated code
+- Frontend: `/agent` page with sidebar conversation list, streaming chat, code block rendering, Deploy Bot button
+- System prompt specialized for Discord bot development (discord.js v14 + discord.py)
+
+## Import / Export Features
+
+- GitHub import: clone a repo, specify entry file + branch
+- URL import: download raw file from any URL (e.g. Replit raw, GitHub raw)
+- GitHub export: push bot file to a GitHub repo via API
+- Download: `GET /api/bots/:id/download` — download bot file
 
 ## Key Commands
 
