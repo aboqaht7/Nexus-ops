@@ -2,7 +2,7 @@
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+Discord Bot Hosting panel — a full-stack monorepo for running Discord bots 24/7.
 
 ## Stack
 
@@ -11,10 +11,25 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Package manager**: pnpm
 - **TypeScript version**: 5.9
 - **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
+- **Database**: PostgreSQL + Drizzle ORM (provisioned but not currently used — bots stored in data/bots.json)
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
+- **File upload**: multer
+
+## Artifacts
+
+- **bot-host** (`/`) — React + Vite dashboard for managing bots (dark themed)
+- **api-server** (`/api`) — Express 5 REST API with bot process management
+
+## Bot Manager
+
+- Bot files stored in `data/bot-files/`
+- Bot registry persisted in `data/bots.json`
+- Supports JavaScript (node) and Python (python3) bots
+- Auto-restart on crash with exponential backoff (max 30s delay)
+- In-memory ring buffer for logs (200 entries per bot)
+- Bots with `autoRestart=true` resume automatically on server restart
 
 ## Key Commands
 

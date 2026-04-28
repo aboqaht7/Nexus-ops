@@ -8,3 +8,63 @@
 export interface HealthStatus {
   status: string;
 }
+
+export type BotLanguage = (typeof BotLanguage)[keyof typeof BotLanguage];
+
+export const BotLanguage = {
+  javascript: "javascript",
+  python: "python",
+} as const;
+
+export type BotStatus = (typeof BotStatus)[keyof typeof BotStatus];
+
+export const BotStatus = {
+  running: "running",
+  stopped: "stopped",
+  crashed: "crashed",
+  starting: "starting",
+} as const;
+
+export interface Bot {
+  id: string;
+  name: string;
+  filename: string;
+  language: BotLanguage;
+  status: BotStatus;
+  autoRestart: boolean;
+  restartCount: number;
+  createdAt: string;
+  startedAt?: string | null;
+  uptimeSeconds?: number | null;
+}
+
+export type BotLogsLogsItemLevel =
+  (typeof BotLogsLogsItemLevel)[keyof typeof BotLogsLogsItemLevel];
+
+export const BotLogsLogsItemLevel = {
+  info: "info",
+  error: "error",
+} as const;
+
+export type BotLogsLogsItem = {
+  timestamp: string;
+  level: BotLogsLogsItemLevel;
+  message: string;
+};
+
+export interface BotLogs {
+  id: string;
+  logs: BotLogsLogsItem[];
+}
+
+export interface BotsStats {
+  total: number;
+  running: number;
+  stopped: number;
+  crashed: number;
+  totalRestarts: number;
+}
+
+export interface ErrorResponse {
+  error: string;
+}

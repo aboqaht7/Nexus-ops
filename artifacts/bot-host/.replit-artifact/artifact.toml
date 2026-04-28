@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Discord Bot Host"
+version = "1.0.0"
+id = "artifacts/bot-host"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22561
+
+[services.development]
+run = "pnpm --filter @workspace/bot-host run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/bot-host", "run", "build" ]
+publicDir = "artifacts/bot-host/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22561"
+BASE_PATH = "/"

@@ -14,3 +14,137 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Returns all registered bots with their current status
+ * @summary List all bots
+ */
+export const ListBotsResponseItem = zod.object({
+  id: zod.string(),
+  name: zod.string(),
+  filename: zod.string(),
+  language: zod.enum(["javascript", "python"]),
+  status: zod.enum(["running", "stopped", "crashed", "starting"]),
+  autoRestart: zod.boolean(),
+  restartCount: zod.number(),
+  createdAt: zod.coerce.date(),
+  startedAt: zod.coerce.date().nullish(),
+  uptimeSeconds: zod.number().nullish(),
+});
+export const ListBotsResponse = zod.array(ListBotsResponseItem);
+
+/**
+ * @summary Get a single bot
+ */
+export const GetBotParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const GetBotResponse = zod.object({
+  id: zod.string(),
+  name: zod.string(),
+  filename: zod.string(),
+  language: zod.enum(["javascript", "python"]),
+  status: zod.enum(["running", "stopped", "crashed", "starting"]),
+  autoRestart: zod.boolean(),
+  restartCount: zod.number(),
+  createdAt: zod.coerce.date(),
+  startedAt: zod.coerce.date().nullish(),
+  uptimeSeconds: zod.number().nullish(),
+});
+
+/**
+ * @summary Delete a bot
+ */
+export const DeleteBotParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+/**
+ * @summary Start a bot
+ */
+export const StartBotParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const StartBotResponse = zod.object({
+  id: zod.string(),
+  name: zod.string(),
+  filename: zod.string(),
+  language: zod.enum(["javascript", "python"]),
+  status: zod.enum(["running", "stopped", "crashed", "starting"]),
+  autoRestart: zod.boolean(),
+  restartCount: zod.number(),
+  createdAt: zod.coerce.date(),
+  startedAt: zod.coerce.date().nullish(),
+  uptimeSeconds: zod.number().nullish(),
+});
+
+/**
+ * @summary Stop a bot
+ */
+export const StopBotParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const StopBotResponse = zod.object({
+  id: zod.string(),
+  name: zod.string(),
+  filename: zod.string(),
+  language: zod.enum(["javascript", "python"]),
+  status: zod.enum(["running", "stopped", "crashed", "starting"]),
+  autoRestart: zod.boolean(),
+  restartCount: zod.number(),
+  createdAt: zod.coerce.date(),
+  startedAt: zod.coerce.date().nullish(),
+  uptimeSeconds: zod.number().nullish(),
+});
+
+/**
+ * @summary Restart a bot
+ */
+export const RestartBotParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const RestartBotResponse = zod.object({
+  id: zod.string(),
+  name: zod.string(),
+  filename: zod.string(),
+  language: zod.enum(["javascript", "python"]),
+  status: zod.enum(["running", "stopped", "crashed", "starting"]),
+  autoRestart: zod.boolean(),
+  restartCount: zod.number(),
+  createdAt: zod.coerce.date(),
+  startedAt: zod.coerce.date().nullish(),
+  uptimeSeconds: zod.number().nullish(),
+});
+
+/**
+ * @summary Get bot logs
+ */
+export const GetBotLogsParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const GetBotLogsResponse = zod.object({
+  id: zod.string(),
+  logs: zod.array(
+    zod.object({
+      timestamp: zod.coerce.date(),
+      level: zod.enum(["info", "error"]),
+      message: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * @summary Get aggregate stats for all bots
+ */
+export const GetBotsStatsResponse = zod.object({
+  total: zod.number(),
+  running: zod.number(),
+  stopped: zod.number(),
+  crashed: zod.number(),
+  totalRestarts: zod.number(),
+});
