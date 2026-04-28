@@ -14,6 +14,8 @@ import BotEditor from "@/pages/bot-editor";
 import SignInPage from "@/pages/sign-in";
 import SignUpPage from "@/pages/sign-up";
 import Pricing from "@/pages/pricing";
+import Checkout from "@/pages/checkout";
+import PaymentSuccess from "@/pages/payment-success";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -67,6 +69,8 @@ function Router() {
       <Route path="/bots/:id/logs" component={() => <Protected component={BotLogs} />} />
       <Route path="/bots/:id/editor" component={() => <Protected component={BotEditor} />} />
       <Route path="/pricing" component={Pricing} />
+      <Route path="/checkout" component={Checkout} />
+      <Route path="/payment-success" component={PaymentSuccess} />
       <Route path="/sign-in/*?" component={SignInPage} />
       <Route path="/sign-up/*?" component={SignUpPage} />
       <Route component={NotFound} />
