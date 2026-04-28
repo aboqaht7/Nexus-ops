@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request } from "express";
 import multer from "multer";
 import { join, extname, basename } from "path";
+import { writeFileSync } from "fs";
 import { getAuth } from "@clerk/express";
 import {
   listBots,
@@ -13,7 +14,9 @@ import {
   getStats,
   registerBot,
   getBotFilesDir,
+  setBotFileContent,
 } from "../lib/bot-manager.js";
+import { getUserLimits } from "../lib/subscriptions.js";
 import {
   ListBotsResponse,
   GetBotResponse,
@@ -87,10 +90,59 @@ router.post(
     }
 
     const userId = getUserId(req);
+
+    // Enforce plan limits
+    const limits = getUserLimits(userId ?? "");
+    if (limits.maxBots !== -1) {
+      const existing = listBots(userId);
+      if (existing.length >= limits.maxBots) {
+        res.status(403).json({
+          error: "PLAN_LIMIT",
+          message: `وصلت للحد الأقصى من البوتات في خطتك الحالية (${limits.maxBots} بوت). رقّ خطتك للمتابعة.`,
+          maxBots: limits.maxBots,
+        });
+        return;
+      }
+    }
+
     const bot = registerBot(name, req.file.filename, userId);
     res.status(201).json(bot);
   }
 );
+
+// POST /bots/create-from-code — create bot from text content (for templates)
+router.post("/bots/create-from-code", (req, res): void => {
+  const { name, code, language } = req.body as { name?: string; code?: string; language?: string };
+
+  if (!name?.trim()) { res.status(400).json({ error: "Bot name is required" }); return; }
+  if (!code?.trim()) { res.status(400).json({ error: "Bot code is required" }); return; }
+
+  const userId = getUserId(req);
+
+  // Enforce plan limits
+  const limits = getUserLimits(userId ?? "");
+  if (limits.maxBots !== -1) {
+    const existing = listBots(userId);
+    if (existing.length >= limits.maxBots) {
+      res.status(403).json({
+        error: "PLAN_LIMIT",
+        message: `وصلت للحد الأقصى من البوتات في خطتك الحالية (${limits.maxBots} بوت). رقّ خطتك للمتابعة.`,
+        maxBots: limits.maxBots,
+      });
+      return;
+    }
+  }
+
+  const ext = language === "python" ? ".py" : ".js";
+  const safeName = name.trim().replace(/[^a-zA-Z0-9_-]/g, "_");
+  const filename = `${safeName}_${Date.now()}${ext}`;
+  const filepath = join(getBotFilesDir(), filename);
+
+  writeFileSync(filepath, code, "utf-8");
+
+  const bot = registerBot(name.trim(), filename, userId);
+  res.status(201).json(bot);
+});
 
 router.get("/bots/:id", (req, res): void => {
   const params = GetBotParams.safeParse(req.params);

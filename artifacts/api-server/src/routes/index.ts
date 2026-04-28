@@ -6,6 +6,7 @@ import anthropicRouter from "./anthropic/index.js";
 import agentRouter from "./agent/index.js";
 import botsEditorRouter from "./bots-editor.js";
 import packagesRouter from "./packages.js";
+import subscriptionsRouter from "./subscriptions.js";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(anthropicRouter);
 router.use(agentRouter);
 router.use(botsEditorRouter);
 router.use(packagesRouter);
+router.use(subscriptionsRouter);
 
 export default router;

@@ -905,8 +905,9 @@ function TemplatesTab({ onSuccess }: { onSuccess: () => void }) {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!resp.ok) {
-        const err = await resp.json().catch(() => null);
-        throw new Error(err?.error || "فشل الرفع");
+        const err = await resp.json().catch(() => null) as { error?: string; message?: string } | null;
+        if (err?.error === "PLAN_LIMIT") throw new Error("PLAN_LIMIT");
+        throw new Error(err?.message ?? err?.error ?? "فشل الرفع");
       }
 
       const result = await resp.json();
@@ -924,7 +925,16 @@ function TemplatesTab({ onSuccess }: { onSuccess: () => void }) {
         onSuccess();
       }
     } catch (e: unknown) {
-      toast({ title: "فشل النشر", description: (e as Error).message, variant: "destructive" });
+      const msg = (e as Error).message;
+      if (msg === "PLAN_LIMIT" || msg.includes("الحد الأقصى")) {
+        toast({
+          title: "⚠️ حد الخطة",
+          description: "وصلت للحد الأقصى من البوتات. رقّ خطتك لإضافة المزيد.",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "فشل النشر", description: msg, variant: "destructive" });
+      }
     } finally {
       setDeploying(false);
     }
