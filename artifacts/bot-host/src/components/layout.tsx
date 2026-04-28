@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link } from "wouter";
-import { Activity, Sparkles, LogOut, Crown } from "lucide-react";
+import { Activity, Sparkles, LogOut, Crown, Settings } from "lucide-react";
 import { useClerk, useUser } from "@clerk/react";
 import {
   DropdownMenu,
@@ -47,6 +47,12 @@ function UserMenu() {
           </span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href={`${basePath}/settings`} className="flex items-center gap-2 cursor-pointer">
+            <Settings className="w-4 h-4" />
+            الإعدادات
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href={`${basePath}/pricing`} className="flex items-center gap-2 cursor-pointer text-primary font-medium">
             <Crown className="w-4 h-4" />

@@ -16,6 +16,7 @@ import SignUpPage from "@/pages/sign-up";
 import Pricing from "@/pages/pricing";
 import Checkout from "@/pages/checkout";
 import PaymentSuccess from "@/pages/payment-success";
+import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -71,6 +72,7 @@ function Router() {
       <Route path="/pricing" component={Pricing} />
       <Route path="/checkout" component={Checkout} />
       <Route path="/payment-success" component={PaymentSuccess} />
+      <Route path="/settings/*?" component={() => <Protected component={Settings} />} />
       <Route path="/sign-in/*?" component={SignInPage} />
       <Route path="/sign-up/*?" component={SignUpPage} />
       <Route component={NotFound} />
