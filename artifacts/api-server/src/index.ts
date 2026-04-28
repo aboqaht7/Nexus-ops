@@ -4,7 +4,7 @@ import type { WebSocket } from "ws";
 import type { IncomingMessage } from "http";
 import app from "./app.js";
 import { logger } from "./lib/logger.js";
-import { resumeAllBots, getBotFilesDir, getBot } from "./lib/bot-manager.js";
+import { resumeAllBots, getBotDir, getBot } from "./lib/bot-manager.js";
 
 const rawPort = process.env["PORT"];
 if (!rawPort) throw new Error("PORT environment variable is required");
@@ -40,14 +40,14 @@ function handleTerminalSession(ws: WebSocket, botId: string) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const pty = require("node-pty") as typeof import("node-pty");
-    const cwd = getBotFilesDir();
+    const cwd = getBotDir(botId);
 
     ptyProcess = pty.spawn("bash", [], {
       name: "xterm-256color",
       cols: 80,
       rows: 24,
       cwd,
-      env: process.env as Record<string, string>,
+      env: { ...process.env as Record<string, string>, PS1: `\\[\\033[1;33m\\]${bot.name}\\[\\033[0m\\]:\\[\\033[1;34m\\]\\w\\[\\033[0m\\]\\$ ` },
     });
 
     ptyProcess.onData((data) => {
@@ -58,9 +58,9 @@ function handleTerminalSession(ws: WebSocket, botId: string) {
       if (ws.readyState === ws.OPEN) ws.close(1000, "Shell exited");
     });
 
-    // Welcome message + cd to show bot file
+    // Welcome message
     setTimeout(() => {
-      ptyProcess?.write(`echo "NexusOps Terminal — bot: ${bot.name}" && ls -la\r`);
+      ptyProcess?.write(`echo -e "\\033[1;32mNexusOps Terminal — ${bot.name}\\033[0m" && ls -la\r`);
     }, 200);
   } catch (err) {
     logger.error({ err, botId }, "Failed to spawn PTY");

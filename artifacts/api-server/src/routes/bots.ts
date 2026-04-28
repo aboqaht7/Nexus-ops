@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request } from "express";
 import multer from "multer";
 import { join, extname, basename } from "path";
-import { writeFileSync } from "fs";
+import { readFileSync, unlinkSync, existsSync } from "fs";
 import { getAuth } from "@clerk/express";
 import {
   listBots,
@@ -14,7 +14,7 @@ import {
   getStats,
   registerBot,
   getBotFilesDir,
-  setBotFileContent,
+  type BotLanguage,
 } from "../lib/bot-manager.js";
 import { getUserLimits } from "../lib/subscriptions.js";
 import {
@@ -105,12 +105,22 @@ router.post(
       }
     }
 
-    const bot = registerBot(name, req.file.filename, userId);
+    // Read code from multer-saved flat file, then registerBot creates isolated dir
+    const flatPath = join(getBotFilesDir(), req.file.filename);
+    const code = existsSync(flatPath) ? readFileSync(flatPath, "utf-8") : "";
+    const ext = extname(req.file.filename).toLowerCase();
+    const lang: BotLanguage = ext === ".py" ? "python" : "javascript";
+
+    const bot = registerBot(name, req.file.filename, code, lang, userId);
+
+    // Remove flat file — registerBot wrote it into isolated dir
+    try { if (existsSync(flatPath)) unlinkSync(flatPath); } catch {}
+
     res.status(201).json(bot);
   }
 );
 
-// POST /bots/create-from-code — create bot from text content (for templates)
+// POST /bots/create-from-code — create bot from text content (for templates / agent)
 router.post("/bots/create-from-code", (req, res): void => {
   const { name, code, language } = req.body as { name?: string; code?: string; language?: string };
 
@@ -119,7 +129,6 @@ router.post("/bots/create-from-code", (req, res): void => {
 
   const userId = getUserId(req);
 
-  // Enforce plan limits
   const limits = getUserLimits(userId ?? "");
   if (limits.maxBots !== -1) {
     const existing = listBots(userId);
@@ -133,14 +142,11 @@ router.post("/bots/create-from-code", (req, res): void => {
     }
   }
 
-  const ext = language === "python" ? ".py" : ".js";
-  const safeName = name.trim().replace(/[^a-zA-Z0-9_-]/g, "_");
-  const filename = `${safeName}_${Date.now()}${ext}`;
-  const filepath = join(getBotFilesDir(), filename);
+  const lang: BotLanguage = language === "python" ? "python" : "javascript";
+  const ext = lang === "python" ? ".py" : ".js";
+  const filename = `index${ext}`;
 
-  writeFileSync(filepath, code, "utf-8");
-
-  const bot = registerBot(name.trim(), filename, userId);
+  const bot = registerBot(name.trim(), filename, code.trim(), lang, userId);
   res.status(201).json(bot);
 });
 

@@ -8,7 +8,8 @@ import {
   startBot,
   stopBot,
   getBot,
-  getBotFilesDir,
+  getBotDir,
+  installPackages,
 } from "../../lib/bot-manager.js";
 import { logger } from "../../lib/logger.js";
 
@@ -19,7 +20,7 @@ const execFileAsync = promisify(execFile);
 export const AGENT_TOOLS = [
   {
     name: "read_bot_file",
-    description: "Read the current complete source code of the bot file. Use this first before making any changes.",
+    description: "Read the complete source code of the bot file. Always call this before making any changes.",
     input_schema: {
       type: "object" as const,
       properties: {},
@@ -28,27 +29,42 @@ export const AGENT_TOOLS = [
   },
   {
     name: "write_bot_file",
-    description: "Write/overwrite the entire bot source code with new content. This saves the file immediately. After writing, use restart_bot to apply changes.",
+    description: "Write/overwrite the entire bot source code. Saves immediately. Call restart_bot after to apply changes.",
     input_schema: {
       type: "object" as const,
       properties: {
         code: {
           type: "string",
-          description: "The complete new source code for the bot file",
+          description: "The complete new source code for the bot",
         },
       },
       required: ["code"],
     },
   },
   {
+    name: "install_packages",
+    description: "Install one or more npm packages (for JavaScript bots) or pip packages (for Python bots) into the bot's isolated environment. Use this before running code that requires external libraries.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        packages: {
+          type: "array",
+          items: { type: "string" },
+          description: "Package names to install. Example: ['discord.js', 'axios'] or ['discord.py', 'requests']",
+        },
+      },
+      required: ["packages"],
+    },
+  },
+  {
     name: "run_command",
-    description: "Run a shell command in the bot's working directory. Use for installing packages (pip install X, npm install X), checking versions, or running quick diagnostics. Output is captured and returned.",
+    description: "Run a shell command in the bot's isolated working directory. Use for checking installed packages, testing imports, or running diagnostics. npm install / pip install commands are available but prefer install_packages for that.",
     input_schema: {
       type: "object" as const,
       properties: {
         command: {
           type: "string",
-          description: "Shell command to run. Example: 'pip install discord.py' or 'npm install discord.js'",
+          description: "Shell command to run. Runs inside the bot's own directory.",
         },
       },
       required: ["command"],
@@ -56,13 +72,13 @@ export const AGENT_TOOLS = [
   },
   {
     name: "get_bot_logs",
-    description: "Fetch the most recent log entries from the running bot. Use this to check for errors, see output, or diagnose issues.",
+    description: "Get the most recent log output from the running bot. Use to check for errors, confirm startup, or diagnose crashes.",
     input_schema: {
       type: "object" as const,
       properties: {
         lines: {
           type: "number",
-          description: "Number of recent log lines to fetch (default 30)",
+          description: "Number of recent log lines to return (default 50)",
         },
       },
       required: [],
@@ -70,7 +86,7 @@ export const AGENT_TOOLS = [
   },
   {
     name: "restart_bot",
-    description: "Restart the bot to apply code changes. Always call this after writing code changes.",
+    description: "Restart the bot to apply code or package changes. Always call after write_bot_file or install_packages.",
     input_schema: {
       type: "object" as const,
       properties: {},
@@ -79,7 +95,7 @@ export const AGENT_TOOLS = [
   },
   {
     name: "stop_bot",
-    description: "Stop the running bot.",
+    description: "Stop the running bot process.",
     input_schema: {
       type: "object" as const,
       properties: {},
@@ -88,7 +104,7 @@ export const AGENT_TOOLS = [
   },
   {
     name: "start_bot",
-    description: "Start the bot.",
+    description: "Start the bot process.",
     input_schema: {
       type: "object" as const,
       properties: {},
@@ -111,8 +127,8 @@ export async function executeTool(
   switch (name) {
     case "read_bot_file": {
       const content = getBotFileContent(botId);
-      if (content === null) return "Error: Bot not found or file does not exist.";
-      if (!content.trim()) return "(empty file)";
+      if (content === undefined) return "Error: Bot not found.";
+      if (!content.trim()) return "(empty file — bot has no code yet)";
       return content;
     }
 
@@ -121,25 +137,40 @@ export async function executeTool(
       if (typeof code !== "string") return "Error: code must be a string.";
       const ok = setBotFileContent(botId, code);
       if (!ok) return "Error: Bot not found.";
-      return `File written successfully (${code.length} characters).`;
+      return `✓ File written (${code.split("\n").length} lines). Call restart_bot to apply.`;
+    }
+
+    case "install_packages": {
+      const pkgsRaw = input["packages"];
+      if (!Array.isArray(pkgsRaw) || pkgsRaw.length === 0) {
+        return "Error: packages must be a non-empty array.";
+      }
+      const packages = pkgsRaw.map(String).filter(Boolean);
+      const result = await installPackages(botId, packages);
+      return result.success
+        ? `✓ Installed: ${packages.join(", ")}\n${result.output}`
+        : `✗ Installation failed:\n${result.output}`;
     }
 
     case "run_command": {
       const command = input["command"];
       if (typeof command !== "string") return "Error: command must be a string.";
 
-      // Safety: limit dangerous commands
-      const blocked = ["rm -rf", "sudo rm", "mkfs", "dd if=", "> /dev/", "shutdown", "reboot"];
+      const blocked = ["rm -rf /", "sudo rm -rf", "mkfs", "dd if=", "> /dev/sd", "shutdown", "reboot", ":(){:|:&};:"];
       if (blocked.some(b => command.includes(b))) {
-        return "Error: This command is not allowed for security reasons.";
+        return "Error: This command is blocked for security reasons.";
       }
 
+      const bot = getBot(botId);
+      if (!bot) return "Error: Bot not found.";
+
+      const cwd = getBotDir(botId);
+
       try {
-        const cwd = getBotFilesDir();
         const { stdout, stderr } = await execFileAsync("bash", ["-c", command], {
           cwd,
-          timeout: 30_000,
-          maxBuffer: 1024 * 1024,
+          timeout: 60_000,
+          maxBuffer: 2 * 1024 * 1024,
           env: { ...process.env, PYTHONUNBUFFERED: "1" },
         });
         const out = [stdout, stderr].filter(Boolean).join("\n").trim();
@@ -152,32 +183,32 @@ export async function executeTool(
     }
 
     case "get_bot_logs": {
-      const lines = typeof input["lines"] === "number" ? input["lines"] : 30;
+      const lines = typeof input["lines"] === "number" ? input["lines"] : 50;
       const logs = getBotLogs(botId);
       if (!logs) return "Error: Bot not found.";
-      if (logs.length === 0) return "(no logs yet)";
+      if (logs.length === 0) return "(no logs yet — bot may not have started)";
       const recent = logs.slice(-lines);
       return recent
-        .map(l => `[${l.timestamp}] ${l.level.toUpperCase()}: ${l.message}`)
+        .map(l => `[${new Date(l.timestamp).toLocaleTimeString("ar-SA")}] ${l.level === "error" ? "✗" : "·"} ${l.message}`)
         .join("\n");
     }
 
     case "restart_bot": {
       const bot = restartBot(botId);
       if (!bot) return "Error: Bot not found.";
-      return `Bot "${bot.name}" is restarting. Status: ${bot.status}`;
+      return `⟳ Restarting "${bot.name}"... Check get_bot_logs in a few seconds to confirm startup.`;
     }
 
     case "stop_bot": {
       const bot = stopBot(botId);
       if (!bot) return "Error: Bot not found.";
-      return `Bot "${bot.name}" stopped.`;
+      return `■ Bot "${bot.name}" stopped.`;
     }
 
     case "start_bot": {
       const bot = startBot(botId);
       if (!bot) return "Error: Bot not found.";
-      return `Bot "${bot.name}" is starting. Status: ${bot.status}`;
+      return `▶ Starting "${bot.name}"... Check get_bot_logs to confirm.`;
     }
 
     default:
@@ -192,8 +223,8 @@ export function buildBotContext(botId: string | null): string {
   const bot = getBot(botId);
   if (!bot) return "";
   return `\n\n---
-You are working on a bot named "${bot.name}" (${bot.language}, status: ${bot.status}).
-The bot file is "${bot.filename}". Use the read_bot_file tool to read its code before making changes.
-Always use write_bot_file to save changes and restart_bot to apply them.
+You are working on bot: "${bot.name}" (${bot.language}, status: ${bot.status}).
+Main file: "${bot.filename}". The bot runs in an isolated directory with its own node_modules/site-packages.
+Workflow: read_bot_file → write_bot_file → install_packages (if needed) → restart_bot → get_bot_logs.
 ---`;
 }

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { spawn } from "child_process";
-import { getBot, getBotFilesDir } from "../lib/bot-manager.js";
+import { join } from "path";
+import { getBot, getBotDir } from "../lib/bot-manager.js";
 import type { Response } from "express";
 
 const router = Router();
@@ -14,35 +15,45 @@ router.post("/bots/:id/packages/install", (req, res: Response) => {
     res.status(400).json({ error: "Package name required" });
     return;
   }
-  if (!getBot(id)) {
+
+  const bot = getBot(id);
+  if (!bot) {
     res.status(404).json({ error: "Bot not found" });
     return;
   }
 
-  const mgr = manager === "pip" ? "pip" : "npm";
-  const args =
-    mgr === "pip"
-      ? ["install", name.trim()]
-      : ["install", name.trim(), "--save"];
+  // Determine package manager
+  const isJs = bot.language === "javascript" || manager === "npm";
+  const mgr = isJs ? "npm" : "pip3";
+
+  // Build args — for pip3, install into bot's site-packages
+  const botDir = getBotDir(id);
+  const args = isJs
+    ? ["install", name.trim(), "--save"]
+    : ["install", name.trim(), "-t", join(botDir, "site-packages"), "--quiet"];
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
   res.flushHeaders();
 
-  const proc = spawn(mgr, args, {
-    cwd: getBotFilesDir(),
-    env: process.env,
-    shell: true,
-  });
-
   const send = (type: string, text: string) => {
     res.write(`data: ${JSON.stringify({ type, text })}\n\n`);
   };
 
+  const proc = spawn(mgr, args, {
+    cwd: botDir,
+    env: {
+      ...process.env,
+      npm_config_prefix: botDir,
+      PYTHONPATH: join(botDir, "site-packages"),
+    },
+    shell: false,
+  });
+
   proc.stdout?.on("data", (d: Buffer) => send("stdout", d.toString()));
   proc.stderr?.on("data", (d: Buffer) => send("stderr", d.toString()));
-  proc.on("error", (err) => send("error", err.message));
+  proc.on("error", (err) => send("error", `Failed to start ${mgr}: ${err.message}`));
   proc.on("exit", (code) => {
     send("done", `Process exited with code ${code ?? 0}`);
     res.end();

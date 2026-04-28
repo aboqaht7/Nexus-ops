@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { spawn } from "child_process";
-import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync, unlinkSync } from "fs";
 import { join, extname, basename } from "path";
 import { randomUUID } from "crypto";
 import { getAuth } from "@clerk/express";
@@ -8,6 +8,7 @@ import {
   registerBot,
   getBot,
   getBotFilesDir,
+  getBotDir,
   type BotLanguage,
 } from "../lib/bot-manager.js";
 import {
@@ -103,14 +104,11 @@ router.post("/bots/import/github", async (req, res): Promise<void> => {
       return;
     }
 
-    const safeName = basename(mainFile, ext).replace(/[^a-zA-Z0-9_-]/g, "_");
-    const destFilename = `${safeName}_${Date.now()}${ext}`;
-    const destPath = join(getBotFilesDir(), destFilename);
+    const filename = `index${ext}`;
+    const lang: BotLanguage = ext === ".py" ? "python" : "javascript";
+    const code = readFileSync(sourceFile, "utf-8");
 
-    const content = readFileSync(sourceFile);
-    writeFileSync(destPath, content);
-
-    const bot = registerBot(name, destFilename, getUserId(req));
+    const bot = registerBot(name, filename, code, lang, getUserId(req));
     req.log.info({ botId: bot.id, repoUrl }, "Bot imported from GitHub");
 
     res.status(201).json({ bot, message: `Bot imported from ${repoUrl}` });
@@ -157,14 +155,11 @@ router.post("/bots/import/url", async (req, res): Promise<void> => {
       return;
     }
 
-    const buffer = Buffer.from(await response.arrayBuffer());
-    const safeName = basename(url.pathname, ext).replace(/[^a-zA-Z0-9_-]/g, "_") || "bot";
-    const destFilename = `${safeName}_${Date.now()}${ext}`;
-    const destPath = join(getBotFilesDir(), destFilename);
+    const code = await response.text();
+    const filename = `index${ext}`;
+    const lang: BotLanguage = ext === ".py" ? "python" : "javascript";
 
-    writeFileSync(destPath, buffer);
-
-    const bot = registerBot(name, destFilename, getUserId(req));
+    const bot = registerBot(name, filename, code, lang, getUserId(req));
     req.log.info({ botId: bot.id, fileUrl }, "Bot imported from URL");
 
     res.status(201).json({ bot, message: `Bot imported from ${fileUrl}` });
@@ -183,7 +178,7 @@ router.get("/bots/:id/download", (req, res): void => {
     return;
   }
 
-  const filePath = join(getBotFilesDir(), bot.filename);
+  const filePath = join(getBotDir(bot.id), bot.filename);
   if (!existsSync(filePath)) {
     res.status(404).json({ error: "Bot file not found on disk" });
     return;
@@ -230,7 +225,7 @@ router.post("/bots/:id/export/github", async (req, res): Promise<void> => {
     const targetDir = join(workDir, ...targetRelPath.split("/").slice(0, -1));
     if (!existsSync(targetDir)) mkdirSync(targetDir, { recursive: true });
 
-    const sourcePath = join(getBotFilesDir(), bot.filename);
+    const sourcePath = join(getBotDir(bot.id), bot.filename);
     const content = readFileSync(sourcePath);
     writeFileSync(targetAbsPath, content);
 
