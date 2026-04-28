@@ -11,7 +11,12 @@ declare global {
 }
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
-const MOYASAR_KEY = import.meta.env.VITE_MOYASAR_PUBLISHABLE_KEY as string;
+// Use test key in development, live key in production
+const MOYASAR_KEY = (
+  import.meta.env.DEV
+    ? import.meta.env.VITE_MOYASAR_TEST_KEY
+    : import.meta.env.VITE_MOYASAR_PUBLISHABLE_KEY
+) as string;
 
 const R = {
   bg: "#FAF7F2",
