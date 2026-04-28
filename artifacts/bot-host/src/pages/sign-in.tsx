@@ -1,72 +1,83 @@
 import { SignIn } from "@clerk/react";
-import { dark } from "@clerk/themes";
-import { Server } from "lucide-react";
 import { Link } from "wouter";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
+const appearance = {
+  cssLayerName: "clerk",
+  variables: {
+    colorPrimary: "#F26207",
+    colorBackground: "#FFFFFF",
+    colorForeground: "#0D0D0D",
+    colorMutedForeground: "#6B6B6B",
+    colorDanger: "#DC2626",
+    colorInput: "#FAF7F2",
+    colorInputForeground: "#0D0D0D",
+    colorNeutral: "#E8DDD5",
+    fontFamily: "'Inter', sans-serif",
+    borderRadius: "0.625rem",
+  },
+  elements: {
+    rootBox: "w-full flex justify-center",
+    cardBox: "w-[440px] max-w-full overflow-hidden shadow-xl",
+    card: "!rounded-2xl !border !border-[#E8DDD5] !bg-white !shadow-none",
+    footer: "!bg-[#FAF7F2] !border-t !border-[#E8DDD5] !rounded-b-2xl",
+    headerTitle: "!text-[#0D0D0D] !font-semibold",
+    headerSubtitle: "!text-[#6B6B6B]",
+    socialButtonsBlockButton: "!border-[#E8DDD5] !bg-[#FAF7F2] hover:!bg-[#F0EAE3]",
+    socialButtonsBlockButtonText: "!text-[#0D0D0D]",
+    formFieldLabel: "!text-[#0D0D0D]",
+    formFieldInput: "!bg-[#FAF7F2] !border-[#E8DDD5] !text-[#0D0D0D] focus:!border-[#F26207]",
+    formButtonPrimary: "!bg-[#F26207] hover:!bg-[#D95600] !text-white !rounded-full",
+    footerActionLink: "!text-[#F26207] hover:!text-[#D95600]",
+    footerActionText: "!text-[#6B6B6B]",
+    dividerText: "!text-[#6B6B6B]",
+    dividerLine: "!bg-[#E8DDD5]",
+    identityPreviewEditButton: "!text-[#F26207]",
+    logoBox: "justify-center",
+    logoImage: "h-8 w-8",
+    alertText: "!text-red-600",
+    formFieldSuccessText: "!text-emerald-600",
+    otpCodeFieldInput: "!border-[#E8DDD5] !bg-[#FAF7F2]",
+  },
+  options: {
+    logoPlacement: "inside",
+    logoLinkUrl: `${window.location.origin}${basePath}/`,
+    logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
+  },
+} as const;
+
 export default function SignInPage() {
   return (
-    <div className="min-h-[100dvh] bg-background flex flex-col">
-      <header className="px-6 h-14 flex items-center border-b border-border/50">
-        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <div className="bg-primary/10 p-1 rounded-md border border-primary/20">
-            <Server className="w-4 h-4 text-primary" />
+    <div style={{ minHeight: "100dvh", background: "#FAF7F2", fontFamily: "'Inter', sans-serif" }}>
+      {/* Nav */}
+      <header style={{
+        height: 60, padding: "0 24px",
+        display: "flex", alignItems: "center",
+        borderBottom: "1px solid #E8DDD5",
+      }}>
+        <Link href="/" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
+          <div style={{ width: 28, height: 28, borderRadius: 7, background: "#F26207", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
+              <rect x="2" y="4" width="14" height="3.5" rx="1" fill="white" />
+              <rect x="2" y="9.5" width="14" height="3.5" rx="1" fill="white" opacity="0.7" />
+              <circle cx="13.5" cy="5.75" r="1.25" fill="#FFD580" />
+            </svg>
           </div>
-          <span className="font-bold text-sm">Nexus<span className="text-primary">Ops</span></span>
+          <span style={{ fontWeight: 700, fontSize: 15, color: "#0D0D0D" }}>
+            Nexus<span style={{ color: "#F26207" }}>Ops</span>
+          </span>
         </Link>
       </header>
-      <div className="flex-1 flex items-center justify-center px-4 py-12">
+
+      {/* Content */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "60px 24px", minHeight: "calc(100dvh - 60px)" }}>
         <SignIn
           routing="path"
           path={`${basePath}/sign-in`}
           signUpUrl={`${basePath}/sign-up`}
           fallbackRedirectUrl={`${basePath}/dashboard`}
-          appearance={{
-            theme: dark,
-            cssLayerName: "clerk",
-            variables: {
-              colorPrimary: "#3b82f6",
-              colorBackground: "#09090b",
-              colorForeground: "#fafafa",
-              colorMutedForeground: "#71717a",
-              colorDanger: "#ef4444",
-              colorInput: "#18181b",
-              colorInputForeground: "#fafafa",
-              colorNeutral: "#27272a",
-              fontFamily: "inherit",
-              borderRadius: "0.5rem",
-            },
-            elements: {
-              rootBox: "w-full flex justify-center",
-              cardBox: "bg-card border border-border rounded-xl w-[440px] max-w-full overflow-hidden shadow-2xl",
-              card: "!shadow-none !border-0 !bg-transparent !rounded-none",
-              footer: "!shadow-none !border-0 !bg-transparent !rounded-none",
-              headerTitle: "text-foreground",
-              headerSubtitle: "text-muted-foreground",
-              socialButtonsBlockButtonText: "text-foreground",
-              formFieldLabel: "text-foreground",
-              footerActionLink: "text-primary hover:text-primary/80",
-              footerActionText: "text-muted-foreground",
-              dividerText: "text-muted-foreground",
-              formButtonPrimary: "bg-primary text-primary-foreground hover:bg-primary/90",
-              formFieldInput: "bg-input text-foreground border-border",
-              socialButtonsBlockButton: "border-border bg-card hover:bg-muted",
-              identityPreviewEditButton: "text-primary",
-              logoBox: "justify-center",
-              logoImage: "h-8 w-8",
-              main: "gap-4",
-              alert: "bg-destructive/10 border-destructive/20",
-              alertText: "text-destructive",
-              formFieldSuccessText: "text-emerald-400",
-              dividerLine: "bg-border",
-            },
-            options: {
-              logoPlacement: "inside",
-              logoLinkUrl: `${window.location.origin}${basePath}/`,
-              logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
-            },
-          }}
+          appearance={appearance}
         />
       </div>
     </div>

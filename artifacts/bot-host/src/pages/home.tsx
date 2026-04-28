@@ -1,220 +1,460 @@
-import { Link } from "wouter";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Server,
-  Terminal,
-  KeyRound,
-  Zap,
-  GitBranch,
-  Sparkles,
-  Code2,
-  RotateCw,
-  ArrowRight,
-  CheckCircle2,
-} from "lucide-react";
+import { useState } from "react";
+import { Link, useLocation } from "wouter";
+import { ArrowRight, Bot, Music, Shield, Star, Gift, Ticket, Hash, RefreshCw } from "lucide-react";
+
+/* ── Replit brand tokens ─────────────────────────────────────────── */
+const R = {
+  bg: "#FAF7F2",
+  bgCard: "#FFFFFF",
+  bgChip: "#F0EAE3",
+  text: "#0D0D0D",
+  muted: "#6B6B6B",
+  border: "#E8DDD5",
+  orange: "#F26207",
+  orangeHover: "#D95600",
+  orangeLight: "#FEF3EC",
+};
+
+const botTypes = [
+  { icon: <Bot className="w-4 h-4" />, label: "Moderation" },
+  { icon: <Music className="w-4 h-4" />, label: "Music" },
+  { icon: <Star className="w-4 h-4" />, label: "Leveling" },
+  { icon: <Gift className="w-4 h-4" />, label: "Giveaway" },
+  { icon: <Ticket className="w-4 h-4" />, label: "Tickets" },
+  { icon: <Hash className="w-4 h-4" />, label: "Logging" },
+];
+
+const examplePrompts = [
+  "A bot that auto-bans spammers",
+  "A music bot with playlist support",
+  "A leveling system with XP roles",
+];
 
 const features = [
   {
-    icon: <RotateCw className="w-5 h-5 text-emerald-400" />,
-    title: "24/7 Auto-restart",
-    desc: "Your bots stay online around the clock. Automatic crash recovery with exponential backoff.",
-    color: "emerald",
+    tag: "Always On",
+    title: "Your bots run\n24/7 without interruption",
+    desc: "Auto-restart on crash, exponential backoff recovery, and real-time uptime monitoring — your bots stay alive around the clock.",
+    bg: "#1A1A2E",
+    textColor: "#FFFFFF",
+    accent: R.orange,
+    big: true,
   },
   {
-    icon: <Code2 className="w-5 h-5 text-blue-400" />,
-    title: "Monaco Editor",
-    desc: "Edit your bot code directly in the browser with VS Code's powerful editor engine.",
-    color: "blue",
+    tag: "Code Editor",
+    title: "VS Code in your browser",
+    desc: "Monaco editor with full syntax highlighting, IntelliSense, and multi-language support for JS and Python.",
+    bg: "#F0EAE3",
+    textColor: R.text,
+    accent: R.orange,
+    big: false,
   },
   {
-    icon: <Terminal className="w-5 h-5 text-violet-400" />,
-    title: "Live Terminal",
-    desc: "Full bash terminal in the browser. Run commands, install packages, debug live.",
-    color: "violet",
+    tag: "Terminal",
+    title: "Full bash terminal",
+    desc: "Real xterm.js terminal connected to a live shell. Run npm install, debug live, execute any command.",
+    bg: "#0D1117",
+    textColor: "#4ADE80",
+    accent: "#4ADE80",
+    big: false,
   },
   {
-    icon: <KeyRound className="w-5 h-5 text-amber-400" />,
-    title: "Secrets Manager",
-    desc: "Per-bot environment variables. Store BOT_TOKEN and other secrets securely.",
-    color: "amber",
+    tag: "Secrets",
+    title: "Secure environment\nvariables",
+    desc: "Per-bot secrets management. Store your BOT_TOKEN and other sensitive keys safely — never exposed in code.",
+    bg: R.orangeLight,
+    textColor: R.text,
+    accent: R.orange,
+    big: false,
   },
   {
-    icon: <Sparkles className="w-5 h-5 text-pink-400" />,
-    title: "AI Assistant",
-    desc: "Agent-4 writes full Discord bots for you. Just describe what you need.",
-    color: "pink",
+    tag: "AI Agent",
+    title: "Agent-4 writes bots for you",
+    desc: "Describe what you need in plain English. Agent-4 generates complete, production-ready Discord bots with a single prompt.",
+    bg: "#EEF2FF",
+    textColor: "#1E1B4B",
+    accent: "#6366F1",
+    big: false,
   },
   {
-    icon: <GitBranch className="w-5 h-5 text-cyan-400" />,
-    title: "GitHub Sync",
-    desc: "Import from GitHub, export back with one click. Keep your code versioned.",
-    color: "cyan",
+    tag: "Packages",
+    title: "npm & pip package manager",
+    desc: "Install any package directly from the browser. Real-time installation output, zero configuration required.",
+    bg: "#F0FDF4",
+    textColor: "#14532D",
+    accent: "#16A34A",
+    big: false,
   },
 ];
 
-const steps = [
-  { n: "01", title: "Create an account", desc: "Sign up free. No credit card required." },
-  { n: "02", title: "Deploy your bot", desc: "Upload a .js or .py file, import from GitHub, or start from a template." },
-  { n: "03", title: "Go live 24/7", desc: "Your bot runs forever. Edit code, manage secrets, watch logs in real time." },
+const plans = [
+  {
+    name: "Starter",
+    price: "Free",
+    sub: "For getting started",
+    items: ["Unlimited bots", "Monaco code editor", "Real-time logs", "Community support"],
+    cta: "Sign up",
+    highlight: false,
+  },
+  {
+    name: "NexusOps Core",
+    price: "$0",
+    sub: "Everything free, forever",
+    items: ["Everything in Starter", "Live terminal access", "npm / pip packages", "Secrets manager", "GitHub sync", "Agent-4 AI assistant"],
+    cta: "Get started",
+    highlight: true,
+  },
 ];
 
 export default function Home() {
+  const [prompt, setPrompt] = useState("");
+  const [promptExample, setPromptExample] = useState(0);
+  const [, navigate] = useLocation();
   const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 
+  const handlePromptSubmit = () => {
+    navigate(`${base}/sign-up`);
+  };
+
+  const cyclePrompt = () => {
+    const next = (promptExample + 1) % examplePrompts.length;
+    setPromptExample(next);
+    setPrompt(examplePrompts[next]);
+  };
+
   return (
-    <div className="min-h-[100dvh] bg-background text-foreground">
-      {/* Nav */}
-      <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-md">
-        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="bg-primary/10 p-1.5 rounded-md border border-primary/20">
-              <Server className="w-5 h-5 text-primary" />
+    <div style={{ background: R.bg, color: R.text, fontFamily: "'Inter', sans-serif", minHeight: "100dvh" }}>
+
+      {/* ── Navbar ─────────────────────────────────────────────────── */}
+      <header style={{
+        position: "sticky", top: 0, zIndex: 50,
+        background: `${R.bg}E6`,
+        backdropFilter: "blur(12px)",
+        borderBottom: `1px solid ${R.border}`,
+      }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          {/* Logo */}
+          <Link href="/" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 8,
+              background: R.orange, display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <rect x="2" y="4" width="14" height="3.5" rx="1" fill="white" />
+                <rect x="2" y="9.5" width="14" height="3.5" rx="1" fill="white" opacity="0.7" />
+                <circle cx="13.5" cy="5.75" r="1.25" fill="#FFD580" />
+              </svg>
             </div>
-            <span className="font-bold text-lg tracking-tight">
-              Nexus<span className="text-primary">Ops</span>
+            <span style={{ fontWeight: 700, fontSize: 17, color: R.text }}>
+              Nexus<span style={{ color: R.orange }}>Ops</span>
             </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" asChild>
-              <Link href={`${base}/sign-in`}>Sign In</Link>
-            </Button>
-            <Button size="sm" className="gap-1.5" asChild>
-              <Link href={`${base}/sign-up`}>
-                Get Started <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </Button>
+          </Link>
+
+          {/* Nav right */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Link
+              href={`${base}/sign-in`}
+              style={{ padding: "7px 16px", fontSize: 14, fontWeight: 500, color: R.text, textDecoration: "none", borderRadius: 8 }}
+              onMouseEnter={e => (e.currentTarget.style.background = R.bgChip)}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+            >
+              Log in
+            </Link>
+            <Link
+              href={`${base}/sign-up`}
+              style={{
+                padding: "7px 18px", fontSize: 14, fontWeight: 600,
+                color: R.orange, textDecoration: "none",
+                border: `1.5px solid ${R.orange}`, borderRadius: 99,
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = R.orange; e.currentTarget.style.color = "#fff"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = R.orange; }}
+            >
+              Create account
+            </Link>
           </div>
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="container mx-auto px-6 pt-24 pb-20 text-center">
-        <Badge variant="outline" className="mb-6 text-xs text-primary border-primary/30 bg-primary/5 px-3 py-1">
-          <Zap className="w-3 h-3 mr-1.5" />
-          Discord Bot Hosting Platform
-        </Badge>
-        <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-none">
-          Host your bots{" "}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-500">
-            24/7 for free
-          </span>
+      {/* ── Hero ───────────────────────────────────────────────────── */}
+      <section style={{ textAlign: "center", padding: "90px 24px 60px", maxWidth: 820, margin: "0 auto" }}>
+        <h1 style={{
+          fontFamily: "'Fraunces', serif",
+          fontSize: "clamp(48px, 7vw, 80px)",
+          fontWeight: 600, lineHeight: 1.08,
+          letterSpacing: "-0.02em",
+          color: R.text, marginBottom: 20,
+        }}>
+          What bot will you build?
         </h1>
-        <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-          NexusOps is the easiest way to deploy and manage Discord bots. Edit code in the browser,
-          view real-time logs, manage secrets — all in one place.
+        <p style={{ fontSize: 18, color: R.muted, marginBottom: 36, lineHeight: 1.6, maxWidth: 520, margin: "0 auto 36px" }}>
+          Deploy Discord bots in seconds — no server needed. Edit code, manage secrets, and go live 24/7 from your browser.
         </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button size="lg" className="gap-2 shadow-lg shadow-primary/20 text-base px-8" asChild>
-            <Link href={`${base}/sign-up`}>
-              Start for free <ArrowRight className="w-4 h-4" />
-            </Link>
-          </Button>
-          <Button size="lg" variant="outline" className="gap-2 text-base px-8" asChild>
-            <Link href={`${base}/sign-in`}>Sign In</Link>
-          </Button>
+
+        {/* Prompt input */}
+        <div style={{
+          background: R.bgCard, border: `1.5px solid ${R.border}`,
+          borderRadius: 16, padding: "12px 12px 12px 16px",
+          display: "flex", alignItems: "center", gap: 10,
+          boxShadow: "0 2px 16px rgba(0,0,0,0.06)",
+          maxWidth: 680, margin: "0 auto",
+          transition: "border-color 0.15s",
+        }}
+          onFocus={e => (e.currentTarget.style.borderColor = R.orange)}
+          onBlur={e => (e.currentTarget.style.borderColor = R.border)}
+        >
+          <button
+            style={{
+              width: 32, height: 32, borderRadius: 8, border: `1px solid ${R.border}`,
+              background: R.bg, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 18, color: R.muted, flexShrink: 0,
+            }}
+          >+</button>
+          <input
+            value={prompt}
+            onChange={e => setPrompt(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handlePromptSubmit()}
+            placeholder="Describe your bot idea, or start from a template..."
+            style={{
+              flex: 1, border: "none", outline: "none",
+              fontSize: 15, color: R.text, background: "transparent",
+              fontFamily: "inherit",
+            }}
+          />
+          <button
+            onClick={handlePromptSubmit}
+            style={{
+              width: 36, height: 36, borderRadius: 99,
+              background: R.orange, border: "none", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0, transition: "background 0.15s",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = R.orangeHover)}
+            onMouseLeave={e => (e.currentTarget.style.background = R.orange)}
+          >
+            <ArrowRight size={17} color="white" />
+          </button>
         </div>
 
-        {/* Stats */}
-        <div className="flex flex-col sm:flex-row gap-8 justify-center mt-16 text-center">
-          {[
-            { value: "24/7", label: "Uptime guarantee" },
-            { value: "JS & Python", label: "Languages supported" },
-            { value: "Free", label: "Forever plan" },
-          ].map((s) => (
-            <div key={s.label}>
-              <div className="text-3xl font-bold text-foreground">{s.value}</div>
-              <div className="text-sm text-muted-foreground mt-1">{s.label}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Features */}
-      <section className="container mx-auto px-6 py-20">
-        <div className="text-center mb-14">
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-            Everything you need to run bots
-          </h2>
-          <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-            A complete developer environment in the browser — no server needed.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {features.map((f) => (
-            <div
-              key={f.title}
-              className="bg-card border border-border rounded-xl p-6 hover:border-primary/30 hover:shadow-md hover:shadow-primary/5 transition-all"
+        {/* Bot type chips */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 20, flexWrap: "wrap" }}>
+          <button
+            style={{ width: 28, height: 28, borderRadius: 99, border: `1px solid ${R.border}`, background: R.bg, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: R.muted }}
+            onClick={() => {}}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M7.5 6L1.5 1.5v9L7.5 6z"/></svg>
+          </button>
+          {botTypes.map((t) => (
+            <button
+              key={t.label}
+              onClick={handlePromptSubmit}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "6px 14px", borderRadius: 99,
+                border: `1px solid ${R.border}`, background: R.bg,
+                fontSize: 13, fontWeight: 500, color: R.text,
+                cursor: "pointer", transition: "all 0.15s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = R.orange; e.currentTarget.style.color = R.orange; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = R.border; e.currentTarget.style.color = R.text; }}
             >
-              <div className="w-10 h-10 rounded-lg bg-muted/50 flex items-center justify-center mb-4 border border-border">
-                {f.icon}
-              </div>
-              <h3 className="font-semibold text-base mb-2">{f.title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+              {t.icon} {t.label}
+            </button>
+          ))}
+          <button
+            style={{ width: 28, height: 28, borderRadius: 99, border: `1px solid ${R.border}`, background: R.bg, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: R.muted }}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M4.5 6L10.5 1.5v9L4.5 6z"/></svg>
+          </button>
+        </div>
+
+        {/* Example prompts */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+          <button
+            onClick={cyclePrompt}
+            style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: R.muted, background: "none", border: "none", cursor: "pointer" }}
+          >
+            <RefreshCw size={12} /> Try an example prompt
+          </button>
+          {examplePrompts.map((p, i) => (
+            <button
+              key={i}
+              onClick={() => { setPrompt(p); }}
+              style={{
+                padding: "4px 12px", fontSize: 13, borderRadius: 99,
+                border: `1px solid ${R.border}`, background: R.bgChip,
+                color: R.text, cursor: "pointer",
+              }}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Social proof ───────────────────────────────────────────── */}
+      <section style={{ textAlign: "center", padding: "20px 24px 60px", borderTop: `1px solid ${R.border}` }}>
+        <p style={{ fontSize: 13, color: R.muted, marginBottom: 28, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 500 }}>
+          Works with your favorite tools
+        </p>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 48, flexWrap: "wrap", opacity: 0.5 }}>
+          {["discord.js", "discord.py", "Node.js", "Python 3", "npm", "pip"].map(l => (
+            <span key={l} style={{ fontSize: 15, fontWeight: 600, color: R.text, letterSpacing: "-0.01em" }}>{l}</span>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Features bento grid ────────────────────────────────────── */}
+      <section style={{ maxWidth: 1100, margin: "0 auto", padding: "60px 24px" }}>
+        <p style={{ textAlign: "center", fontSize: 13, fontWeight: 600, color: R.orange, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 14 }}>
+          PLATFORM FEATURES
+        </p>
+        <h2 style={{
+          textAlign: "center",
+          fontFamily: "'Fraunces', serif",
+          fontSize: "clamp(32px, 4vw, 48px)",
+          fontWeight: 600, color: R.text,
+          marginBottom: 48, lineHeight: 1.15,
+        }}>
+          Everything you need to run bots
+        </h2>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+          {features.map((f, i) => (
+            <div
+              key={i}
+              style={{
+                background: f.bg,
+                borderRadius: 16,
+                padding: 28,
+                border: `1px solid ${f.bg === R.bgCard ? R.border : "transparent"}`,
+                gridColumn: i === 0 ? "span 1" : undefined,
+              }}
+            >
+              <span style={{
+                display: "inline-block",
+                fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
+                textTransform: "uppercase", color: f.accent,
+                marginBottom: 12,
+              }}>
+                {f.tag}
+              </span>
+              <h3 style={{
+                fontFamily: "'Fraunces', serif",
+                fontSize: 20, fontWeight: 600, lineHeight: 1.3,
+                color: f.textColor, marginBottom: 10,
+                whiteSpace: "pre-line",
+              }}>
+                {f.title}
+              </h3>
+              <p style={{ fontSize: 14, lineHeight: 1.65, color: f.bg === "#0D1117" || f.bg === "#1A1A2E" ? "rgba(255,255,255,0.55)" : R.muted }}>
+                {f.desc}
+              </p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="border-t border-border/50 bg-muted/20">
-        <div className="container mx-auto px-6 py-20">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-              Up and running in minutes
-            </h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-            {steps.map((s) => (
-              <div key={s.n} className="text-center">
-                <div className="text-5xl font-black text-primary/20 mb-4">{s.n}</div>
-                <h3 className="font-semibold text-lg mb-2">{s.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{s.desc}</p>
-              </div>
-            ))}
-          </div>
+      {/* ── Pricing ────────────────────────────────────────────────── */}
+      <section style={{ padding: "60px 24px 80px", borderTop: `1px solid ${R.border}` }}>
+        <h2 style={{
+          textAlign: "center",
+          fontFamily: "'Fraunces', serif",
+          fontSize: "clamp(32px, 4vw, 48px)",
+          fontWeight: 600, color: R.text, marginBottom: 12,
+        }}>Pricing</h2>
+        <p style={{ textAlign: "center", fontSize: 16, color: R.muted, marginBottom: 48 }}>
+          Choose the best plan for you.
+        </p>
+
+        <div style={{ display: "flex", gap: 20, maxWidth: 780, margin: "0 auto", justifyContent: "center", flexWrap: "wrap" }}>
+          {plans.map((p) => (
+            <div
+              key={p.name}
+              style={{
+                background: R.bgCard,
+                border: p.highlight ? `2px solid ${R.orange}` : `1px solid ${R.border}`,
+                borderRadius: 16, padding: 28, flex: "1 1 300px", maxWidth: 360,
+                boxShadow: p.highlight ? `0 0 0 4px ${R.orangeLight}` : "none",
+              }}
+            >
+              {p.highlight && (
+                <div style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  background: R.orange, color: "#fff",
+                  fontSize: 11, fontWeight: 700, letterSpacing: "0.06em",
+                  padding: "3px 10px", borderRadius: 99, marginBottom: 14,
+                }}>
+                  MOST POPULAR
+                </div>
+              )}
+              <p style={{ fontSize: 14, fontWeight: 600, color: R.muted, marginBottom: 6 }}>{p.name}</p>
+              <p style={{ fontFamily: "'Fraunces', serif", fontSize: 42, fontWeight: 600, color: R.text, marginBottom: 4 }}>
+                {p.price}
+              </p>
+              <p style={{ fontSize: 13, color: R.muted, marginBottom: 24 }}>{p.sub}</p>
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, marginBottom: 28, display: "flex", flexDirection: "column", gap: 10 }}>
+                {p.items.map(item => (
+                  <li key={item} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: R.text }}>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <circle cx="8" cy="8" r="8" fill={p.highlight ? R.orange : R.bgChip} />
+                      <path d="M5 8l2 2 4-4" stroke={p.highlight ? "#fff" : R.orange} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href={`${base}/sign-up`}
+                style={{
+                  display: "block", textAlign: "center",
+                  padding: "11px 0", borderRadius: 10,
+                  fontSize: 14, fontWeight: 600, textDecoration: "none",
+                  background: p.highlight ? R.orange : "transparent",
+                  color: p.highlight ? "#fff" : R.text,
+                  border: `1.5px solid ${p.highlight ? R.orange : R.border}`,
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={e => {
+                  if (!p.highlight) { e.currentTarget.style.borderColor = R.orange; e.currentTarget.style.color = R.orange; }
+                  else e.currentTarget.style.background = R.orangeHover;
+                }}
+                onMouseLeave={e => {
+                  if (!p.highlight) { e.currentTarget.style.borderColor = R.border; e.currentTarget.style.color = R.text; }
+                  else e.currentTarget.style.background = R.orange;
+                }}
+              >
+                {p.cta}
+              </Link>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* Included */}
-      <section className="container mx-auto px-6 py-20">
-        <div className="max-w-2xl mx-auto bg-card border border-border rounded-2xl p-8 shadow-xl shadow-black/20">
-          <h2 className="text-2xl font-bold mb-6 text-center">What's included — free</h2>
-          <ul className="space-y-3">
-            {[
-              "Unlimited bots",
-              "Monaco code editor (VS Code in browser)",
-              "Real-time terminal access",
-              "Secrets & environment variables",
-              "Auto-restart on crash",
-              "GitHub import & export",
-              "Agent-4 AI coding assistant",
-              "Real-time log streaming",
-              "Package manager (npm / pip)",
-            ].map((item) => (
-              <li key={item} className="flex items-center gap-3 text-sm">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                {item}
-              </li>
-            ))}
-          </ul>
-          <Button size="lg" className="w-full mt-8 gap-2" asChild>
-            <Link href={`${base}/sign-up`}>
-              Create free account <ArrowRight className="w-4 h-4" />
-            </Link>
-          </Button>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-border/50 py-8">
-        <div className="container mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <Server className="w-4 h-4 text-primary" />
-            <span className="font-semibold text-foreground/80">NexusOps</span>
+      {/* ── Footer ─────────────────────────────────────────────────── */}
+      <footer style={{ borderTop: `1px solid ${R.border}`, padding: "28px 24px" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 24, height: 24, borderRadius: 6, background: R.orange, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="13" height="13" viewBox="0 0 18 18" fill="none">
+                <rect x="2" y="4" width="14" height="3.5" rx="1" fill="white" />
+                <rect x="2" y="9.5" width="14" height="3.5" rx="1" fill="white" opacity="0.7" />
+                <circle cx="13.5" cy="5.75" r="1.25" fill="#FFD580" />
+              </svg>
+            </div>
+            <span style={{ fontWeight: 600, fontSize: 14, color: R.text }}>NexusOps</span>
           </div>
-          <span>© 2026 NexusOps — Discord Bot Hosting Platform</span>
+          <p style={{ fontSize: 13, color: R.muted }}>© 2026 NexusOps — Discord Bot Hosting Platform</p>
+          <div style={{ display: "flex", gap: 20 }}>
+            {["Docs", "GitHub", "Discord"].map(l => (
+              <a key={l} href="#" style={{ fontSize: 13, color: R.muted, textDecoration: "none" }}
+                onMouseEnter={e => (e.currentTarget.style.color = R.text)}
+                onMouseLeave={e => (e.currentTarget.style.color = R.muted)}
+              >{l}</a>
+            ))}
+          </div>
         </div>
       </footer>
     </div>
