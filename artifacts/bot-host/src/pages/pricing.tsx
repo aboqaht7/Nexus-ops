@@ -196,16 +196,16 @@ export default function Pricing() {
             ))}
           </ul>
 
-          <a
-            href="mailto:pay@nexusops.app?subject=اشتراك Pro&body=أريد الاشتراك في خطة Pro بـ10 دولار شهرياً"
+          <Link
+            href={`${base}/checkout`}
             style={{
               display: "block", textAlign: "center", padding: "13px 0",
               borderRadius: 10, fontSize: 15, fontWeight: 700, textDecoration: "none",
               background: R.orange, color: "#fff",
             }}
           >
-            اشترك الآن — $10/شهر
-          </a>
+            اشترك الآن — 37 ر.س/شهر
+          </Link>
           <p style={{ fontSize: 11, color: R.muted, textAlign: "center", marginTop: 10 }}>
             إلغاء في أي وقت · لا التزامات
           </p>
