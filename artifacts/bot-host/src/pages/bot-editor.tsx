@@ -19,6 +19,8 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Layout } from "@/components/layout";
+import { TerminalPanel } from "@/components/terminal-panel";
+import { PackagesPanel } from "@/components/packages-panel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -38,6 +40,7 @@ import {
   Eye,
   EyeOff,
   Loader2,
+  PackageSearch,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -54,6 +57,8 @@ interface LogLine {
   message: string;
 }
 
+type ActiveTab = "console" | "terminal" | "secrets" | "packages";
+
 const STATUS_COLORS: Record<BotStatus, string> = {
   running: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
   stopped: "bg-slate-500/10 text-slate-400 border-slate-500/20",
@@ -68,7 +73,7 @@ export default function BotEditor() {
 
   const [code, setCode] = useState<string>("");
   const [isDirty, setIsDirty] = useState(false);
-  const [activeTab, setActiveTab] = useState<"console" | "secrets">("console");
+  const [activeTab, setActiveTab] = useState<ActiveTab>("console");
   const [logs, setLogs] = useState<LogLine[]>([]);
   const [envRows, setEnvRows] = useState<EnvRow[]>([]);
   const [sseConnected, setSseConnected] = useState(false);
@@ -93,14 +98,12 @@ export default function BotEditor() {
   const stopBot = useStopBot();
   const restartBot = useRestartBot();
 
-  // Load file into editor
   useEffect(() => {
     if (fileData?.content !== undefined && !isDirty) {
       setCode(fileData.content);
     }
   }, [fileData?.content]);
 
-  // Load env vars
   useEffect(() => {
     if (envData?.vars) {
       setEnvRows(envData.vars.map((v) => ({ key: v.key, value: v.value, visible: false })));
@@ -134,7 +137,6 @@ export default function BotEditor() {
     };
   }, [id]);
 
-  // Auto-scroll console
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
@@ -157,7 +159,6 @@ export default function BotEditor() {
     }
   }, [id, code, saveFile, qc, toast]);
 
-  // Ctrl+S to save
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
@@ -171,13 +172,8 @@ export default function BotEditor() {
 
   const handleBotAction = (action: any, label: string) => {
     action.mutate({ id: id! }, {
-      onSuccess: () => {
-        invalidateBotQueries();
-        toast({ title: label });
-      },
-      onError: (e: any) => {
-        toast({ title: "Error", description: e.message, variant: "destructive" });
-      },
+      onSuccess: () => { invalidateBotQueries(); toast({ title: label }); },
+      onError: (e: any) => { toast({ title: "Error", description: e.message, variant: "destructive" }); },
     });
   };
 
@@ -195,24 +191,14 @@ export default function BotEditor() {
     }
   };
 
-  const addEnvRow = () => {
-    setEnvRows((prev) => [...prev, { key: "", value: "", visible: false }]);
-  };
-
-  const removeEnvRow = (i: number) => {
-    setEnvRows((prev) => prev.filter((_, idx) => idx !== i));
-  };
-
-  const updateEnvRow = (i: number, field: "key" | "value", val: string) => {
-    setEnvRows((prev) => prev.map((r, idx) => idx === i ? { ...r, [field]: val } : r));
-  };
-
-  const toggleVisible = (i: number) => {
-    setEnvRows((prev) => prev.map((r, idx) => idx === i ? { ...r, visible: !r.visible } : r));
-  };
+  const addEnvRow = () => setEnvRows((p) => [...p, { key: "", value: "", visible: false }]);
+  const removeEnvRow = (i: number) => setEnvRows((p) => p.filter((_, idx) => idx !== i));
+  const updateEnvRow = (i: number, field: "key" | "value", val: string) =>
+    setEnvRows((p) => p.map((r, idx) => idx === i ? { ...r, [field]: val } : r));
+  const toggleVisible = (i: number) =>
+    setEnvRows((p) => p.map((r, idx) => idx === i ? { ...r, visible: !r.visible } : r));
 
   const monacoLang = bot?.language === "python" ? "python" : "javascript";
-
   const isRunning = bot?.status === "running" || bot?.status === "starting";
 
   if (botLoading) {
@@ -236,12 +222,41 @@ export default function BotEditor() {
     );
   }
 
+  const tabs: { id: ActiveTab; label: string; icon: React.ReactNode; badge?: React.ReactNode }[] = [
+    {
+      id: "console",
+      label: "Console",
+      icon: <Terminal className="w-3.5 h-3.5" />,
+      badge: sseConnected ? (
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+      ) : null,
+    },
+    {
+      id: "terminal",
+      label: "Terminal",
+      icon: <Terminal className="w-3.5 h-3.5" />,
+    },
+    {
+      id: "secrets",
+      label: "Secrets",
+      icon: <KeyRound className="w-3.5 h-3.5" />,
+      badge: envRows.length > 0 ? (
+        <span className="text-[10px] bg-primary/20 text-primary rounded px-1">{envRows.length}</span>
+      ) : null,
+    },
+    {
+      id: "packages",
+      label: "Packages",
+      icon: <PackageSearch className="w-3.5 h-3.5" />,
+    },
+  ];
+
   return (
     <div className="h-[100dvh] flex flex-col bg-background text-foreground font-sans overflow-hidden">
       {/* Top bar */}
       <div className="flex items-center gap-3 px-4 h-12 border-b border-border/50 bg-background/90 backdrop-blur flex-shrink-0">
         <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
-          <Link href="/"><ArrowLeft className="w-3.5 h-3.5" /></Link>
+          <Link href="/dashboard"><ArrowLeft className="w-3.5 h-3.5" /></Link>
         </Button>
 
         <div className="flex items-center gap-2 min-w-0">
@@ -255,13 +270,10 @@ export default function BotEditor() {
             )}
             {bot.status}
           </Badge>
-          <span className="text-xs text-muted-foreground font-mono hidden sm:block">
-            {bot.filename}
-          </span>
+          <span className="text-xs text-muted-foreground font-mono hidden sm:block">{bot.filename}</span>
         </div>
 
         <div className="ml-auto flex items-center gap-1.5">
-          {/* Save */}
           <Button
             variant={isDirty ? "default" : "outline"}
             size="sm"
@@ -273,7 +285,6 @@ export default function BotEditor() {
             {isDirty ? "Save*" : "Saved"}
           </Button>
 
-          {/* Run / Stop */}
           {!isRunning ? (
             <Button
               size="sm"
@@ -281,8 +292,7 @@ export default function BotEditor() {
               onClick={() => handleBotAction(startBot, "Bot started")}
               disabled={startBot.isPending}
             >
-              <Play className="w-3.5 h-3.5" />
-              Run
+              <Play className="w-3.5 h-3.5" />Run
             </Button>
           ) : (
             <Button
@@ -292,8 +302,7 @@ export default function BotEditor() {
               onClick={() => handleBotAction(stopBot, "Bot stopped")}
               disabled={stopBot.isPending}
             >
-              <Square className="w-3.5 h-3.5" />
-              Stop
+              <Square className="w-3.5 h-3.5" />Stop
             </Button>
           )}
 
@@ -323,10 +332,7 @@ export default function BotEditor() {
               language={monacoLang}
               value={code}
               theme="vs-dark"
-              onChange={(val) => {
-                setCode(val ?? "");
-                setIsDirty(true);
-              }}
+              onChange={(val) => { setCode(val ?? ""); setIsDirty(true); }}
               options={{
                 fontSize: 13,
                 fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
@@ -351,61 +357,40 @@ export default function BotEditor() {
         {/* Right panel */}
         <div className="w-[340px] xl:w-[400px] flex flex-col min-h-0 flex-shrink-0">
           {/* Tabs */}
-          <div className="flex border-b border-border/50 bg-muted/20 flex-shrink-0">
-            <button
-              onClick={() => setActiveTab("console")}
-              className={cn(
-                "flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors",
-                activeTab === "console"
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Terminal className="w-3.5 h-3.5" />
-              Console
-              {sseConnected && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab("secrets")}
-              className={cn(
-                "flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors",
-                activeTab === "secrets"
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <KeyRound className="w-3.5 h-3.5" />
-              Secrets
-              {envRows.length > 0 && (
-                <span className="text-[10px] bg-primary/20 text-primary rounded px-1">
-                  {envRows.length}
-                </span>
-              )}
-            </button>
+          <div className="flex border-b border-border/50 bg-muted/20 flex-shrink-0 overflow-x-auto">
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap shrink-0",
+                  activeTab === t.id
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {t.icon}
+                {t.label}
+                {t.badge}
+              </button>
+            ))}
           </div>
 
-          {/* Console */}
+          {/* Console panel */}
           {activeTab === "console" && (
             <div className="flex-1 min-h-0 bg-[#0c0c0e] flex flex-col">
-              <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/5">
+              <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/5 flex-shrink-0">
                 <span className="text-[10px] font-mono text-zinc-500">
                   {sseConnected ? "● live" : "○ connecting..."}
                 </span>
-                <button
-                  onClick={() => setLogs([])}
-                  className="text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors"
-                >
+                <button onClick={() => setLogs([])} className="text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors">
                   Clear
                 </button>
               </div>
               <ScrollArea className="flex-1">
                 <div className="p-3 font-mono text-xs space-y-0.5">
                   {logs.length === 0 && (
-                    <p className="text-zinc-600 py-4 text-center text-[11px]">
-                      Start your bot to see logs...
-                    </p>
+                    <p className="text-zinc-600 py-4 text-center text-[11px]">Start your bot to see logs...</p>
                   )}
                   {logs.map((log, i) => (
                     <div
@@ -418,9 +403,7 @@ export default function BotEditor() {
                       <span className="text-zinc-600 shrink-0 text-[10px] pt-px">
                         {new Date(log.timestamp).toTimeString().slice(0, 8)}
                       </span>
-                      {log.level === "error" && (
-                        <AlertCircle className="w-3 h-3 shrink-0 mt-0.5 text-red-500" />
-                      )}
+                      {log.level === "error" && <AlertCircle className="w-3 h-3 shrink-0 mt-0.5 text-red-500" />}
                       <span className="break-all whitespace-pre-wrap">{log.message}</span>
                     </div>
                   ))}
@@ -430,24 +413,29 @@ export default function BotEditor() {
             </div>
           )}
 
-          {/* Secrets */}
+          {/* Terminal panel */}
+          {activeTab === "terminal" && (
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <TerminalPanel botId={id!} active={activeTab === "terminal"} />
+            </div>
+          )}
+
+          {/* Secrets panel */}
           {activeTab === "secrets" && (
             <div className="flex-1 min-h-0 flex flex-col">
               <ScrollArea className="flex-1">
                 <div className="p-3 space-y-2">
                   <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-                    Environment variables are injected when your bot starts.
-                    Use <code className="bg-muted px-1 rounded text-[11px]">process.env.KEY</code> in JS or{" "}
-                    <code className="bg-muted px-1 rounded text-[11px]">os.environ.get('KEY')</code> in Python.
+                    Environment variables injected at startup. Use{" "}
+                    <code className="bg-muted px-1 rounded text-[11px]">process.env.KEY</code> (JS) or{" "}
+                    <code className="bg-muted px-1 rounded text-[11px]">os.environ.get('KEY')</code> (Python).
                   </p>
-
                   {envRows.length === 0 && (
                     <div className="py-6 text-center text-muted-foreground">
                       <KeyRound className="w-8 h-8 mx-auto mb-2 opacity-20" />
                       <p className="text-xs">No secrets yet</p>
                     </div>
                   )}
-
                   {envRows.map((row, i) => (
                     <div key={i} className="flex gap-1.5 items-center">
                       <Input
@@ -472,34 +460,18 @@ export default function BotEditor() {
                           {row.visible ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                         </button>
                       </div>
-                      <button
-                        onClick={() => removeEnvRow(i)}
-                        className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
-                      >
+                      <button onClick={() => removeEnvRow(i)} className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   ))}
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full h-7 text-xs mt-2"
-                    onClick={addEnvRow}
-                  >
-                    <Plus className="w-3.5 h-3.5 mr-1.5" />
-                    Add Secret
+                  <Button variant="outline" size="sm" className="w-full h-7 text-xs mt-2" onClick={addEnvRow}>
+                    <Plus className="w-3.5 h-3.5 mr-1.5" />Add Secret
                   </Button>
                 </div>
               </ScrollArea>
-
               <div className="p-3 border-t border-border/50 flex-shrink-0">
-                <Button
-                  size="sm"
-                  className="w-full h-7 text-xs"
-                  onClick={handleSaveEnv}
-                  disabled={saveEnv.isPending}
-                >
+                <Button size="sm" className="w-full h-7 text-xs" onClick={handleSaveEnv} disabled={saveEnv.isPending}>
                   {saveEnv.isPending ? (
                     <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                   ) : (
@@ -508,9 +480,16 @@ export default function BotEditor() {
                   Save Secrets
                 </Button>
                 <p className="text-[10px] text-muted-foreground text-center mt-1.5">
-                  Restart the bot to apply new secrets
+                  Restart bot to apply new secrets
                 </p>
               </div>
+            </div>
+          )}
+
+          {/* Packages panel */}
+          {activeTab === "packages" && bot && (
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <PackagesPanel botId={id!} language={bot.language as "javascript" | "python"} />
             </div>
           )}
         </div>

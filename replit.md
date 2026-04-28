@@ -31,12 +31,27 @@ Discord Bot Hosting panel — a full-stack monorepo for running Discord bots 24/
 - Auto-restart on crash with exponential backoff (max 30s delay)
 - SSE log streaming via `subscribeToLogs()` pub/sub; 500-entry ring buffer
 
+## Authentication (Clerk)
+
+- Multi-user support via `@clerk/express` (server) + `@clerk/react` (frontend)
+- Keys: `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`
+- Clerk proxy mounted at `/api/__clerk` (production only)
+- `clerkMiddleware()` in Express reads session cookies + Bearer tokens
+- `getUserId(req)` extracts userId from auth context inline in routes
+- Bot records include optional `userId` field; listBots filters by owner
+- Bearer token getter set via `setAuthTokenGetter` in App.tsx for API calls
+- Routes: `/` (landing), `/sign-in`, `/sign-up`, `/dashboard`, `/agent`
+- Protected routes: unauthorized → `<RedirectToSignIn />`
+- `bots.ts` and `bots-import-export.ts` pass userId when registering bots
+
 ## Replit-like IDE Features (per bot)
 
 - `/bots/:id/editor` — full-screen Monaco editor page
   - Monaco code editor (left, syntax-highlighted JS/Python)
-  - Console tab: SSE real-time log stream via `GET /api/bots/:id/logs/stream`
-  - Secrets tab: add/edit/remove KEY=VALUE env vars with show/hide toggle
+  - **Console tab**: SSE real-time log stream via `GET /api/bots/:id/logs/stream`
+  - **Terminal tab**: xterm.js + node-pty WebSocket terminal via `wss://.../api/bots/:id/terminal`
+  - **Secrets tab**: add/edit/remove KEY=VALUE env vars with show/hide toggle
+  - **Packages tab**: npm/pip install panel with SSE install output stream (`POST /api/bots/:id/packages/install`)
   - Top bar: Run / Stop / Restart / Save buttons
   - Ctrl+S to save; unsaved indicator (*) on Save button
 - `GET /api/bots/:id/file` + `PUT /api/bots/:id/file` — read/write bot source
@@ -61,6 +76,13 @@ Discord Bot Hosting panel — a full-stack monorepo for running Discord bots 24/
 - URL import: download raw file from any URL (e.g. Replit raw, GitHub raw)
 - GitHub export: push bot file to a GitHub repo via API
 - Download: `GET /api/bots/:id/download` — download bot file
+- **Templates**: 6 pre-built templates (Ping/Slash/Moderation/Welcome in JS, Ping/Logger in Python) in Deploy dialog
+
+## Landing Page
+
+- Public landing page at `/` (visible when signed out)
+- Hero section, features grid (6), how-it-works (3 steps), included features list
+- Sign in/Sign up CTAs; auto-redirects signed-in users to `/dashboard`
 
 ## Key Commands
 

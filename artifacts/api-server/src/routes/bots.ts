@@ -1,6 +1,7 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request } from "express";
 import multer from "multer";
 import { join, extname, basename } from "path";
+import { getAuth } from "@clerk/express";
 import {
   listBots,
   getBot,
@@ -12,7 +13,7 @@ import {
   getStats,
   registerBot,
   getBotFilesDir,
-} from "../lib/bot-manager";
+} from "../lib/bot-manager.js";
 import {
   ListBotsResponse,
   GetBotResponse,
@@ -30,6 +31,10 @@ import {
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
+
+function getUserId(req: Request): string | undefined {
+  return getAuth(req).userId ?? undefined;
+}
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
@@ -60,8 +65,9 @@ router.get("/bots/stats", (_req, res): void => {
   res.json(GetBotsStatsResponse.parse(stats));
 });
 
-router.get("/bots", (_req, res): void => {
-  const bots = listBots();
+router.get("/bots", (req, res): void => {
+  const userId = getUserId(req);
+  const bots = listBots(userId);
   res.json(ListBotsResponse.parse(bots));
 });
 
@@ -80,7 +86,8 @@ router.post(
       return;
     }
 
-    const bot = registerBot(name, req.file.filename);
+    const userId = getUserId(req);
+    const bot = registerBot(name, req.file.filename, userId);
     res.status(201).json(bot);
   }
 );

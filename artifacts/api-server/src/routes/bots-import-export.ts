@@ -3,21 +3,26 @@ import { spawn } from "child_process";
 import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from "fs";
 import { join, extname, basename } from "path";
 import { randomUUID } from "crypto";
+import { getAuth } from "@clerk/express";
 import {
   registerBot,
   getBot,
   getBotFilesDir,
   type BotLanguage,
-} from "../lib/bot-manager";
+} from "../lib/bot-manager.js";
 import {
   ImportBotFromGithubBody,
   ImportBotFromUrlBody,
   ExportBotToGithubParams,
   ExportBotToGithubBody,
 } from "@workspace/api-zod";
-import { logger } from "../lib/logger";
+import { logger } from "../lib/logger.js";
 
 const router: IRouter = Router();
+
+function getUserId(req: import("express").Request): string | undefined {
+  return getAuth(req).userId ?? undefined;
+}
 
 const CLONE_TIMEOUT_MS = 60_000;
 const TMP_DIR = join(process.cwd(), "data", "tmp");
@@ -105,7 +110,7 @@ router.post("/bots/import/github", async (req, res): Promise<void> => {
     const content = readFileSync(sourceFile);
     writeFileSync(destPath, content);
 
-    const bot = registerBot(name, destFilename);
+    const bot = registerBot(name, destFilename, getUserId(req));
     req.log.info({ botId: bot.id, repoUrl }, "Bot imported from GitHub");
 
     res.status(201).json({ bot, message: `Bot imported from ${repoUrl}` });
@@ -159,7 +164,7 @@ router.post("/bots/import/url", async (req, res): Promise<void> => {
 
     writeFileSync(destPath, buffer);
 
-    const bot = registerBot(name, destFilename);
+    const bot = registerBot(name, destFilename, getUserId(req));
     req.log.info({ botId: bot.id, fileUrl }, "Bot imported from URL");
 
     res.status(201).json({ bot, message: `Bot imported from ${fileUrl}` });

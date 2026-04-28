@@ -25,6 +25,7 @@ export interface BotRecord {
   createdAt: string;
   startedAt: string | null;
   uptimeSeconds: number | null;
+  userId?: string;
 }
 
 export interface LogEntry {
@@ -107,9 +108,13 @@ export function getBotFilesDir(): string {
   return BOT_FILES_DIR;
 }
 
-export function listBots(): BotRecord[] {
+export function listBots(userId?: string): BotRecord[] {
   const bots = loadBots();
-  return bots.map((b) => enrichBot(b));
+  // Show bots owned by this user + legacy bots without any owner
+  const filtered = userId
+    ? bots.filter((b) => b.userId === userId || !b.userId)
+    : bots;
+  return filtered.map((b) => enrichBot(b));
 }
 
 function enrichBot(b: BotRecord): BotRecord {
@@ -136,7 +141,8 @@ export function getBot(id: string): BotRecord | undefined {
 
 export function registerBot(
   name: string,
-  filename: string
+  filename: string,
+  userId?: string
 ): BotRecord {
   const ext = extname(filename).toLowerCase();
   const language: BotLanguage =
@@ -153,6 +159,7 @@ export function registerBot(
     createdAt: new Date().toISOString(),
     startedAt: null,
     uptimeSeconds: null,
+    ...(userId ? { userId } : {}),
   };
 
   const bots = loadBots();
