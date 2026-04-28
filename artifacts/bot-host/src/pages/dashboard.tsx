@@ -2,57 +2,65 @@ import { useListBots, useGetBotsStats, getListBotsQueryKey, getGetBotsStatsQuery
 import { UploadBotDialog } from "@/components/upload-bot-dialog";
 import { BotCard } from "@/components/bot-card";
 import { Layout } from "@/components/layout";
-import { Activity, Server, XCircle, Clock } from "lucide-react";
+import { Activity, Server, XCircle, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Dashboard() {
-  const { data: bots, isLoading: isLoadingBots } = useListBots({ 
-    query: { refetchInterval: 3000, queryKey: getListBotsQueryKey() } 
+  const { data: bots, isLoading: isLoadingBots } = useListBots({
+    query: { refetchInterval: 3000, queryKey: getListBotsQueryKey() }
   });
-  
-  const { data: stats, isLoading: isLoadingStats } = useGetBotsStats({ 
-    query: { refetchInterval: 3000, queryKey: getGetBotsStatsQueryKey() } 
+
+  const { data: stats, isLoading: isLoadingStats } = useGetBotsStats({
+    query: { refetchInterval: 3000, queryKey: getGetBotsStatsQueryKey() }
   });
 
   return (
     <Layout>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Fleet Overview</h1>
-          <p className="text-muted-foreground mt-1">Manage and monitor your deployed Discord bots.</p>
+          <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "'Fraunces', serif" }}>نظرة عامة على بوتاتك</h1>
+          <p className="text-muted-foreground mt-1 text-sm">إدارة ومراقبة بوتات Discord الخاصة بك.</p>
         </div>
         <UploadBotDialog />
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-        <StatCard 
-          title="Total Bots" 
-          value={stats?.total} 
-          icon={<Server className="w-5 h-5 text-primary" />} 
-          isLoading={isLoadingStats} 
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+        <StatCard
+          title="إجمالي البوتات"
+          value={stats?.total}
+          icon={<Server className="w-4 h-4 text-primary" />}
+          isLoading={isLoadingStats}
         />
-        <StatCard 
-          title="Running" 
-          value={stats?.running} 
-          icon={<Activity className="w-5 h-5 text-emerald-500" />} 
-          isLoading={isLoadingStats} 
+        <StatCard
+          title="يعمل الآن"
+          value={stats?.running}
+          icon={<Activity className="w-4 h-4 text-emerald-500" />}
+          isLoading={isLoadingStats}
+          accent="emerald"
         />
-        <StatCard 
-          title="Crashed" 
-          value={stats?.crashed} 
-          icon={<XCircle className="w-5 h-5 text-red-500" />} 
-          isLoading={isLoadingStats} 
+        <StatCard
+          title="تعطّل"
+          value={stats?.crashed}
+          icon={<XCircle className="w-4 h-4 text-red-500" />}
+          isLoading={isLoadingStats}
+          accent="red"
         />
-        <StatCard 
-          title="Total Restarts" 
-          value={stats?.totalRestarts} 
-          icon={<Clock className="w-5 h-5 text-amber-500" />} 
-          isLoading={isLoadingStats} 
+        <StatCard
+          title="إعادات التشغيل"
+          value={stats?.totalRestarts}
+          icon={<RefreshCw className="w-4 h-4 text-amber-500" />}
+          isLoading={isLoadingStats}
+          accent="amber"
         />
       </div>
 
-      <h2 className="text-xl font-semibold tracking-tight mb-4 border-b border-border/50 pb-2">Active Deployments</h2>
-      
+      {/* Bots list */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-base font-semibold text-foreground">البوتات النشطة</h2>
+        <div className="h-px flex-1 bg-border mx-4" />
+      </div>
+
       {isLoadingBots ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map(i => (
@@ -68,11 +76,17 @@ export default function Dashboard() {
           ))}
         </div>
       ) : bots?.length === 0 ? (
-        <div className="text-center py-16 px-4 border border-dashed border-border rounded-xl bg-muted/10">
-          <Server className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-          <h3 className="text-lg font-medium text-foreground mb-1">No bots deployed</h3>
+        <div className="text-center py-20 px-4 border border-dashed border-border rounded-2xl bg-muted/30">
+          <div style={{ width: 48, height: 48, borderRadius: 14, background: "#F26207", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+            <svg width="26" height="26" viewBox="0 0 18 18" fill="none">
+              <rect x="2" y="4" width="14" height="3.5" rx="1" fill="white" />
+              <rect x="2" y="9.5" width="14" height="3.5" rx="1" fill="white" opacity="0.7" />
+              <circle cx="13.5" cy="5.75" r="1.25" fill="#FFD580" />
+            </svg>
+          </div>
+          <h3 className="text-base font-semibold text-foreground mb-1">لا توجد بوتات مُنشرة</h3>
           <p className="text-muted-foreground text-sm max-w-md mx-auto mb-6">
-            You don't have any bots running yet. Upload a JavaScript or Python file to get started.
+            لم تقم بنشر أي بوتات بعد. قم بتحميل ملف JavaScript أو Python للبدء.
           </p>
           <UploadBotDialog />
         </div>
@@ -87,15 +101,23 @@ export default function Dashboard() {
   );
 }
 
-function StatCard({ title, value, icon, isLoading }: { title: string, value?: number, icon: React.ReactNode, isLoading: boolean }) {
+function StatCard({
+  title, value, icon, isLoading, accent
+}: {
+  title: string;
+  value?: number;
+  icon: React.ReactNode;
+  isLoading: boolean;
+  accent?: "emerald" | "red" | "amber";
+}) {
   return (
-    <div className="bg-card border border-border/60 rounded-xl p-4 flex flex-col shadow-sm">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium text-muted-foreground tracking-wide">{title}</span>
+    <div className="bg-card border border-border rounded-xl p-4 flex flex-col shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-medium text-muted-foreground">{title}</span>
         {icon}
       </div>
       {isLoading ? (
-        <Skeleton className="h-8 w-16" />
+        <Skeleton className="h-7 w-12" />
       ) : (
         <span className="text-2xl font-bold text-foreground">{value ?? 0}</span>
       )}
