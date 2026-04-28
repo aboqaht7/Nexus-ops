@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { ArrowRight, Shield, Lock } from "lucide-react";
+import { ArrowRight, Shield, Lock, Coins } from "lucide-react";
 
 declare global {
   interface Window {
@@ -22,14 +22,83 @@ const R = {
   border: "#E8DDD5",
   orange: "#F26207",
   orangeLight: "#FEF3EC",
+  purple: "#7C3AED",
+  purpleLight: "#F5F3FF",
 };
 
+/* ─── Plan config ─────────────────────────────────────────────────── */
+
+interface PlanInfo {
+  nameAr: string;
+  label: string;
+  monthlySar: number;
+  yearlySar: number;
+  color: string;
+  features: string[];
+  tokens: string;
+}
+
+const PLANS: Record<string, PlanInfo> = {
+  pro: {
+    nameAr: "NexusOps Pro",
+    label: "Pro",
+    monthlySar: 37,
+    yearlySar: 370,
+    color: R.orange,
+    tokens: "500 توكن / شهر",
+    features: [
+      "حتى 5 بوتات",
+      "500 توكن Agent-4 شهرياً",
+      "بوتات بدون انقطاع 24/7",
+      "أولوية في الموارد",
+      "نسخ احتياطي تلقائي يومي",
+      "مزامنة GitHub",
+      "دعم فوري عبر Discord",
+      "إزالة شعار NexusOps",
+    ],
+  },
+  unlimited: {
+    nameAr: "NexusOps Unlimited",
+    label: "Unlimited",
+    monthlySar: 75,
+    yearlySar: 750,
+    color: R.purple,
+    tokens: "توكنات غير محدودة",
+    features: [
+      "بوتات غير محدودة",
+      "توكنات Agent-4 غير محدودة",
+      "كل مميزات Pro",
+      "موارد حصرية مضاعفة",
+      "دعم SLA مضمون",
+      "API مخصص",
+      "بيئات Dev/Prod",
+      "لوحة تحكم مؤسسية",
+    ],
+  },
+};
+
+function getParams() {
+  const params = new URLSearchParams(window.location.search);
+  const plan = params.get("plan") ?? "pro";
+  const billing = params.get("billing") ?? "monthly";
+  return { plan, billing };
+}
+
 export default function Checkout() {
+  const { plan: planKey, billing } = getParams();
+  const planInfo = PLANS[planKey] ?? PLANS.pro;
+  const isYearly = billing === "yearly";
+  const amountSar = isYearly ? planInfo.yearlySar : planInfo.monthlySar;
+  const amountHalala = amountSar * 100;
+
   const [sdkReady, setSdkReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const initialized = useRef(false);
 
-  /* Load Moyasar SDK dynamically */
+  const accentColor = planInfo.color;
+  const accentLight = planKey === "unlimited" ? R.purpleLight : R.orangeLight;
+
+  /* Load Moyasar SDK */
   useEffect(() => {
     if (document.getElementById("moyasar-css")) {
       setSdkReady(!!window.Moyasar);
@@ -55,7 +124,7 @@ export default function Checkout() {
     document.head.appendChild(script);
   }, []);
 
-  /* Init Moyasar form once SDK is ready */
+  /* Init Moyasar form once SDK ready */
   useEffect(() => {
     if (!sdkReady || initialized.current) return;
     if (!window.Moyasar) return;
@@ -68,19 +137,19 @@ export default function Checkout() {
 
     window.Moyasar.init({
       element: ".mysr-form",
-      amount: 3700,           /* 37 ريال = 3700 هللة */
+      amount: amountHalala,
       currency: "SAR",
-      description: "NexusOps Pro — اشتراك شهري",
+      description: `${planInfo.nameAr} — اشتراك ${isYearly ? "سنوي" : "شهري"}`,
       publishable_api_key: MOYASAR_KEY,
-      callback_url: `${window.location.origin}${base}/payment-success`,
+      callback_url: `${window.location.origin}${base}/payment-success?plan=${planKey}&billing=${billing}`,
       methods: ["creditcard", "applepay", "stcpay"],
       apple_pay: {
         country: "SA",
-        label: "NexusOps Pro",
+        label: planInfo.nameAr,
         validate_merchant_url: "https://api.moyasar.com/v1/applepay/initiate",
       },
     });
-  }, [sdkReady]);
+  }, [sdkReady, amountHalala, planInfo, isYearly, planKey, billing]);
 
   return (
     <div style={{ minHeight: "100dvh", background: R.bg, fontFamily: "'Cairo', 'Inter', sans-serif", direction: "rtl" }}>
@@ -106,7 +175,7 @@ export default function Checkout() {
       </header>
 
       {/* Content */}
-      <div style={{ maxWidth: 960, margin: "0 auto", padding: "40px 24px", display: "grid", gridTemplateColumns: "1fr 380px", gap: 32, alignItems: "start" }}>
+      <div style={{ maxWidth: 980, margin: "0 auto", padding: "40px 24px", display: "grid", gridTemplateColumns: "1fr 380px", gap: 32, alignItems: "start" }}>
 
         {/* Left — Order summary */}
         <div>
@@ -114,34 +183,78 @@ export default function Checkout() {
             إتمام الاشتراك
           </h1>
           <p style={{ fontSize: 14, color: R.muted, marginBottom: 32 }}>
-            اشتراك NexusOps Pro — يُجدَّد شهرياً، يُلغى في أي وقت.
+            {planInfo.nameAr} — اشتراك {isYearly ? "سنوي (وفّر شهرين)" : "شهري"} · يُلغى في أي وقت.
           </p>
 
+          {/* Billing toggle shortcut */}
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 0, background: R.bgChip, borderRadius: 99, padding: 3, marginBottom: 24 }}>
+            <Link
+              href={`${base}/checkout?plan=${planKey}&billing=monthly`}
+              style={{ padding: "6px 16px", fontSize: 12, fontWeight: 600, borderRadius: 99, textDecoration: "none",
+                background: !isYearly ? R.bgCard : "transparent",
+                color: !isYearly ? R.text : R.muted,
+                boxShadow: !isYearly ? "0 1px 4px rgba(0,0,0,0.08)" : "none" }}
+            >شهري</Link>
+            <Link
+              href={`${base}/checkout?plan=${planKey}&billing=yearly`}
+              style={{ padding: "6px 16px", fontSize: 12, fontWeight: 600, borderRadius: 99, textDecoration: "none",
+                background: isYearly ? R.bgCard : "transparent",
+                color: isYearly ? R.text : R.muted,
+                boxShadow: isYearly ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+                display: "flex", alignItems: "center", gap: 5 }}
+            >
+              سنوي
+              <span style={{ fontSize: 9, background: "#10B981", color: "#fff", padding: "1px 6px", borderRadius: 99, fontWeight: 700 }}>وفّر 17%</span>
+            </Link>
+          </div>
+
+          {/* Plan toggle */}
+          <div style={{ display: "flex", gap: 10, marginBottom: 24 }}>
+            {Object.entries(PLANS).map(([key, p]) => (
+              <Link
+                key={key}
+                href={`${base}/checkout?plan=${key}&billing=${billing}`}
+                style={{ padding: "8px 16px", fontSize: 13, fontWeight: 600, borderRadius: 10, textDecoration: "none",
+                  background: planKey === key ? p.color : "transparent",
+                  color: planKey === key ? "#fff" : R.muted,
+                  border: `1.5px solid ${planKey === key ? p.color : R.border}`,
+                  transition: "all 0.15s" }}
+              >
+                {p.label}
+              </Link>
+            ))}
+          </div>
+
           {/* Order box */}
-          <div style={{ background: R.bgCard, border: `1px solid ${R.border}`, borderRadius: 16, padding: 24, marginBottom: 24 }}>
+          <div style={{ background: R.bgCard, border: `2px solid ${accentColor}`, borderRadius: 16, padding: 24, marginBottom: 24, boxShadow: `0 0 0 4px ${accentLight}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 16, borderBottom: `1px solid ${R.border}` }}>
               <div>
-                <p style={{ fontWeight: 700, fontSize: 16, color: R.text }}>NexusOps Pro</p>
-                <p style={{ fontSize: 13, color: R.muted, marginTop: 2 }}>اشتراك شهري</p>
+                <p style={{ fontWeight: 700, fontSize: 16, color: R.text }}>{planInfo.nameAr}</p>
+                <p style={{ fontSize: 13, color: R.muted, marginTop: 2 }}>اشتراك {isYearly ? "سنوي" : "شهري"}</p>
               </div>
               <div style={{ textAlign: "left" }}>
-                <p style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 700, color: R.text }}>37 ر.س</p>
-                <p style={{ fontSize: 12, color: R.muted }}>/شهر</p>
+                <p style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 700, color: R.text }}>{amountSar} ر.س</p>
+                <p style={{ fontSize: 12, color: R.muted }}>/{isYearly ? "سنة" : "شهر"}</p>
               </div>
             </div>
 
-            {/* Features recap */}
-            <div style={{ paddingTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-              {[
-                "جميع مميزات الخطة المجانية",
-                "أولوية في الموارد وبدون انقطاع",
-                "نسخ احتياطي تلقائي يومي",
-                "دعم مباشر عبر Discord",
-                "مزامنة GitHub وAgent-4 AI",
-                "إزالة شعار NexusOps",
-              ].map(f => (
+            {isYearly && (
+              <div style={{ margin: "12px 0 0", padding: "8px 12px", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8, fontSize: 12, color: "#166534", fontWeight: 600 }}>
+                🎉 وفّرت {planInfo.monthlySar * 2} ر.س (شهرين مجاناً)
+              </div>
+            )}
+
+            {/* Token info */}
+            <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", background: accentLight, borderRadius: 8 }}>
+              <Coins size={14} color={accentColor} />
+              <span style={{ fontSize: 12, color: R.text, fontWeight: 600 }}>{planInfo.tokens}</span>
+            </div>
+
+            {/* Features */}
+            <div style={{ paddingTop: 16, display: "flex", flexDirection: "column", gap: 9 }}>
+              {planInfo.features.map(f => (
                 <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: R.text }}>
-                  <span style={{ width: 17, height: 17, borderRadius: 99, background: R.orange, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <span style={{ width: 17, height: 17, borderRadius: 99, background: accentColor, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     <svg width="9" height="9" viewBox="0 0 12 12" fill="none">
                       <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -182,10 +295,8 @@ export default function Checkout() {
               </div>
             ) : null}
 
-            {/* Moyasar mounts here */}
             <div className="mysr-form" />
 
-            {/* Payment logos */}
             <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${R.border}` }}>
               <p style={{ fontSize: 11, color: R.muted, marginBottom: 10, textAlign: "center" }}>وسائل الدفع المقبولة</p>
               <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
@@ -198,7 +309,6 @@ export default function Checkout() {
             </div>
           </div>
 
-          {/* Moyasar branding */}
           <div style={{ textAlign: "center", marginTop: 14 }}>
             <a href="https://moyasar.com" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: R.muted, textDecoration: "none" }}>
               مدعوم بـ <span style={{ fontWeight: 700 }}>ميسر</span>

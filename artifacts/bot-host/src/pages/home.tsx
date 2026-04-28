@@ -89,20 +89,34 @@ const features = [
 
 const plans = [
   {
-    name: "الأساسية",
+    name: "مجاني",
     price: "مجاني",
-    sub: "للبدء وتجربة المنصة",
-    items: ["بوتات غير محدودة", "محرر Monaco", "سجلات مباشرة", "دعم المجتمع"],
+    sub: "للبدء والتجربة",
+    items: ["بوت واحد فقط", "50 توكن Agent-4 / شهر", "محرر Monaco", "سجلات مباشرة", "دعم المجتمع"],
     cta: "إنشاء حساب",
     highlight: false,
+    ctaHref: "sign-up",
+    queryParam: "",
   },
   {
     name: "NexusOps Pro",
-    price: "$10",
-    sub: "شهرياً للمشاريع الجادة",
-    items: ["كل مميزات الأساسية", "تيرمينال حي", "مدير npm/pip", "أسرار مشفرة", "مزامنة GitHub", "Agent-4 AI"],
-    cta: "اشترك الآن",
+    price: "37 ر.س",
+    sub: "شهرياً — أو 370 ر.س/سنة",
+    items: ["حتى 5 بوتات", "500 توكن Agent-4 / شهر", "24/7 بدون انقطاع", "نسخ احتياطي يومي", "مزامنة GitHub", "دعم Discord فوري"],
+    cta: "اشترك في Pro",
     highlight: true,
+    ctaHref: "checkout",
+    queryParam: "pro",
+  },
+  {
+    name: "Unlimited",
+    price: "75 ر.س",
+    sub: "شهرياً — أو 750 ر.س/سنة",
+    items: ["بوتات غير محدودة", "توكنات Agent-4 غير محدودة", "موارد حصرية مضاعفة", "API مخصص", "دعم SLA مضمون", "بيئات Dev/Prod"],
+    cta: "اشترك في Unlimited",
+    highlight: false,
+    ctaHref: "checkout",
+    queryParam: "unlimited",
   },
 ];
 
@@ -415,24 +429,18 @@ export default function Home() {
                 ))}
               </ul>
               <Link
-                href={`${base}/sign-up`}
+                href={p.queryParam ? `${base}/${p.ctaHref}?plan=${p.queryParam}&billing=monthly` : `${base}/${p.ctaHref}`}
                 style={{
                   display: "block", textAlign: "center",
                   padding: "11px 0", borderRadius: 10,
                   fontSize: 14, fontWeight: 600, textDecoration: "none",
-                  background: p.highlight ? R.orange : "transparent",
-                  color: p.highlight ? "#fff" : R.text,
-                  border: `1.5px solid ${p.highlight ? R.orange : R.border}`,
+                  background: p.name === "Unlimited" ? "#7C3AED" : p.highlight ? R.orange : "transparent",
+                  color: (p.highlight || p.name === "Unlimited") ? "#fff" : R.text,
+                  border: `1.5px solid ${p.name === "Unlimited" ? "#7C3AED" : p.highlight ? R.orange : R.border}`,
                   transition: "all 0.15s",
                 }}
-                onMouseEnter={e => {
-                  if (!p.highlight) { e.currentTarget.style.borderColor = R.orange; e.currentTarget.style.color = R.orange; }
-                  else e.currentTarget.style.background = R.orangeHover;
-                }}
-                onMouseLeave={e => {
-                  if (!p.highlight) { e.currentTarget.style.borderColor = R.border; e.currentTarget.style.color = R.text; }
-                  else e.currentTarget.style.background = R.orange;
-                }}
+                onMouseEnter={e => { e.currentTarget.style.opacity = "0.88"; }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
               >
                 {p.cta}
               </Link>
