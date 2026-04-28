@@ -36,7 +36,6 @@ import {
 import {
   Bot,
   Plus,
-  Trash2,
   Send,
   Sparkles,
   Copy,
@@ -45,6 +44,15 @@ import {
   MessageSquare,
   ChevronRight,
   X,
+  FileCode,
+  Terminal,
+  RotateCw,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Play,
+  Square,
+  ScrollText,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -53,6 +61,27 @@ interface CodeBlock {
   lang: string;
   code: string;
 }
+
+/* ── Streaming event types ─────────────────────────────────────────────── */
+
+type ToolEvent =
+  | { type: "tool_start"; id: string; name: string }
+  | { type: "tool_running"; id: string; name: string; input: Record<string, unknown> }
+  | { type: "tool_result"; id: string; name: string; output: string };
+
+type StreamEvent =
+  | { type: "text"; content: string }
+  | ToolEvent;
+
+const TOOL_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
+  read_bot_file:  { label: "قراءة ملف البوت", icon: <FileCode size={13} /> },
+  write_bot_file: { label: "كتابة كود البوت", icon: <Code2 size={13} /> },
+  run_command:    { label: "تشغيل أمر", icon: <Terminal size={13} /> },
+  get_bot_logs:   { label: "قراءة اللوغات", icon: <ScrollText size={13} /> },
+  restart_bot:    { label: "إعادة تشغيل البوت", icon: <RotateCw size={13} /> },
+  start_bot:      { label: "تشغيل البوت", icon: <Play size={13} /> },
+  stop_bot:       { label: "إيقاف البوت", icon: <Square size={13} /> },
+};
 
 interface ParsedSegment {
   type: "text" | "code";
@@ -146,6 +175,134 @@ function CodeBlockView({ lang, code, onDeploy }: CodeBlockViewProps) {
       <pre className="p-4 overflow-x-auto text-sm bg-background/50">
         <code className="font-mono text-foreground/90">{code}</code>
       </pre>
+    </div>
+  );
+}
+
+/* ── Tool Call Card ─────────────────────────────────────────────────────── */
+
+interface ToolCardProps {
+  name: string;
+  input?: Record<string, unknown>;
+  output?: string;
+  status: "starting" | "running" | "done";
+}
+
+function ToolCard({ name, input, output, status }: ToolCardProps) {
+  const [expanded, setExpanded] = useState(false);
+  const meta = TOOL_LABELS[name] ?? { label: name, icon: <Terminal size={13} /> };
+
+  const inputPreview = name === "write_bot_file" && input?.code
+    ? `${String(input.code).split("\n").length} سطر من الكود`
+    : name === "run_command" && input?.command
+    ? String(input.command)
+    : null;
+
+  return (
+    <div style={{
+      margin: "6px 0",
+      borderRadius: 10,
+      border: `1px solid ${status === "done" ? "#BBF7D0" : "#E8DDD5"}`,
+      background: status === "done" ? "#F0FDF4" : "#FAF7F2",
+      overflow: "hidden",
+      fontSize: 12,
+    }}>
+      <div
+        style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", cursor: output ? "pointer" : "default" }}
+        onClick={() => output && setExpanded(e => !e)}
+      >
+        <span style={{ color: status === "done" ? "#16A34A" : "#F26207", display: "flex" }}>
+          {status === "done" ? <CheckCircle2 size={13} /> : (
+            <span style={{ animation: "spin 1s linear infinite", display: "inline-flex" }}><RotateCw size={13} /></span>
+          )}
+        </span>
+        <span style={{ color: "#6B6B6B", display: "flex", alignItems: "center", gap: 4 }}>
+          {meta.icon}
+        </span>
+        <span style={{ fontWeight: 600, color: "#0D0D0D", flex: 1 }}>{meta.label}</span>
+        {inputPreview && (
+          <span style={{ color: "#6B6B6B", fontFamily: "monospace", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {inputPreview}
+          </span>
+        )}
+        {output && (expanded ? <ChevronUp size={12} color="#6B6B6B" /> : <ChevronDown size={12} color="#6B6B6B" />)}
+      </div>
+      {expanded && output && (
+        <div style={{ padding: "8px 12px", borderTop: "1px solid #E8DDD5", background: "#fff" }}>
+          <pre style={{ fontSize: 11, fontFamily: "monospace", color: "#374151", whiteSpace: "pre-wrap", maxHeight: 200, overflow: "auto", margin: 0 }}>
+            {output.length > 2000 ? output.slice(0, 2000) + "\n...(مقتطع)" : output}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Streaming display ─────────────────────────────────────────────────── */
+
+interface StreamingDisplayProps {
+  events: StreamEvent[];
+  onDeploy: (code: string, lang: string) => void;
+}
+
+function StreamingDisplay({ events, onDeploy }: StreamingDisplayProps) {
+  // Build tool states: combine tool_start, tool_running, tool_result by id
+  const toolStates = new Map<string, { name: string; input?: Record<string, unknown>; output?: string; status: "starting" | "running" | "done" }>();
+  let textContent = "";
+
+  for (const ev of events) {
+    if (ev.type === "text") {
+      textContent += ev.content;
+    } else if (ev.type === "tool_start") {
+      toolStates.set(ev.id, { name: ev.name, status: "starting" });
+    } else if (ev.type === "tool_running") {
+      const existing = toolStates.get(ev.id);
+      toolStates.set(ev.id, { name: ev.name, input: ev.input, status: "running", output: existing?.output });
+    } else if (ev.type === "tool_result") {
+      const existing = toolStates.get(ev.id);
+      toolStates.set(ev.id, { name: ev.name, input: existing?.input, output: ev.output, status: "done" });
+    }
+  }
+
+  // Render tools in order they appeared (by insertion order of ids)
+  const toolOrder: string[] = [];
+  for (const ev of events) {
+    if (ev.type === "tool_start" && !toolOrder.includes(ev.id)) toolOrder.push(ev.id);
+  }
+
+  const segments = parseMessage(textContent);
+
+  return (
+    <div className="flex gap-3 px-4 py-3 justify-start">
+      <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+        <Sparkles className="w-4 h-4 text-primary" />
+      </div>
+      <div className="max-w-[85%] flex flex-col gap-1">
+        {toolOrder.map(id => {
+          const s = toolStates.get(id);
+          if (!s) return null;
+          return <ToolCard key={id} name={s.name} input={s.input} output={s.output} status={s.status} />;
+        })}
+        {textContent && (
+          <div className="text-sm text-foreground/90">
+            {segments.map((seg, i) =>
+              seg.type === "code" ? (
+                <CodeBlockView key={i} lang={seg.lang!} code={seg.content} onDeploy={onDeploy} />
+              ) : (
+                <InlineText key={i} text={seg.content} />
+              )
+            )}
+            <span className="inline-block w-2 h-4 bg-primary/70 rounded animate-pulse ml-0.5" />
+          </div>
+        )}
+        {!textContent && toolOrder.length === 0 && (
+          <div className="flex items-center gap-1 px-3 py-2 rounded-lg bg-muted/30 border border-border/40">
+            <span className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce [animation-delay:0ms]" />
+            <span className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce [animation-delay:150ms]" />
+            <span className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce [animation-delay:300ms]" />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -341,7 +498,7 @@ export default function AgentPage() {
   const [deployCode, setDeployCode] = useState({ code: "", lang: "" });
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
-  const [streamingContent, setStreamingContent] = useState("");
+  const [streamingEvents, setStreamingEvents] = useState<StreamEvent[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -361,7 +518,7 @@ export default function AgentPage() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [activeConv?.messages, streamingContent]);
+  }, [activeConv?.messages, streamingEvents]);
 
   useEffect(() => {
     if (activeConvId) {
@@ -413,10 +570,9 @@ export default function AgentPage() {
     const message = input.trim();
     setInput("");
     setStreaming(true);
-    setStreamingContent("");
+    setStreamingEvents([]);
 
     const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-
     const abort = new AbortController();
     abortRef.current = abort;
 
@@ -446,25 +602,29 @@ export default function AgentPage() {
 
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
-          try {
-            const json = JSON.parse(line.slice(6));
-            if (json.content) {
-              setStreamingContent((prev) => prev + json.content);
-            }
-            if (json.done) {
-              qc.invalidateQueries({ queryKey: getGetAnthropicConversationQueryKey(activeConvId) });
-              setStreamingContent("");
-            }
-            if (json.error) {
-              throw new Error(json.error);
-            }
-          } catch {}
+          let json: Record<string, unknown>;
+          try { json = JSON.parse(line.slice(6)); } catch { continue; }
+
+          if (json.type === "text" && json.content) {
+            setStreamingEvents(prev => [...prev, { type: "text", content: json.content as string }]);
+          } else if (json.type === "tool_start") {
+            setStreamingEvents(prev => [...prev, { type: "tool_start", id: json.id as string, name: json.name as string }]);
+          } else if (json.type === "tool_running") {
+            setStreamingEvents(prev => [...prev, { type: "tool_running", id: json.id as string, name: json.name as string, input: (json.input ?? {}) as Record<string, unknown> }]);
+          } else if (json.type === "tool_result") {
+            setStreamingEvents(prev => [...prev, { type: "tool_result", id: json.id as string, name: json.name as string, output: json.output as string }]);
+          } else if (json.type === "done") {
+            qc.invalidateQueries({ queryKey: getGetAnthropicConversationQueryKey(activeConvId) });
+            setStreamingEvents([]);
+          } else if (json.type === "error") {
+            throw new Error(json.error as string);
+          }
         }
       }
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
         toast({ title: "خطأ", description: (err as Error).message, variant: "destructive" });
-        setStreamingContent("");
+        setStreamingEvents([]);
       }
     } finally {
       setStreaming(false);
@@ -622,12 +782,26 @@ export default function AgentPage() {
                     )}
                   </div>
                 </div>
-                {streaming && (
-                  <Badge variant="secondary" className="text-xs animate-pulse">
-                    <Sparkles className="w-3 h-3 ml-1" />
-                    الوكيل يفكر...
-                  </Badge>
-                )}
+                {streaming && (() => {
+                  const lastTool = [...streamingEvents].reverse().find(e => e.type === "tool_start" || e.type === "tool_running");
+                  const isRunningTool = lastTool && !streamingEvents.find(e => e.type === "tool_result" && e.id === (lastTool as { id: string }).id);
+                  const toolMeta = isRunningTool ? TOOL_LABELS[(lastTool as { name: string }).name] : null;
+                  return (
+                    <Badge variant="secondary" className="text-xs animate-pulse gap-1">
+                      {isRunningTool && toolMeta ? (
+                        <>
+                          <RotateCw className="w-3 h-3 animate-spin" />
+                          {toolMeta.label}...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3 h-3" />
+                          الوكيل يفكر...
+                        </>
+                      )}
+                    </Badge>
+                  );
+                })()}
               </div>
 
               <ScrollArea className="flex-1">
@@ -642,24 +816,8 @@ export default function AgentPage() {
                     <MessageBubble key={msg.id} message={msg} onDeploy={handleDeployClick} />
                   ))}
 
-                  {streaming && streamingContent && (
-                    <MessageBubble
-                      message={{ role: "assistant", content: streamingContent, streaming: true }}
-                      onDeploy={handleDeployClick}
-                    />
-                  )}
-
-                  {streaming && !streamingContent && (
-                    <div className="flex gap-3 px-4 py-3">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
-                        <Sparkles className="w-4 h-4 text-primary animate-spin" />
-                      </div>
-                      <div className="flex items-center gap-1 px-3 py-2 rounded-lg bg-muted/30 border border-border/40">
-                        <span className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce [animation-delay:0ms]" />
-                        <span className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce [animation-delay:150ms]" />
-                        <span className="w-1.5 h-1.5 bg-muted-foreground/60 rounded-full animate-bounce [animation-delay:300ms]" />
-                      </div>
-                    </div>
+                  {streaming && (
+                    <StreamingDisplay events={streamingEvents} onDeploy={handleDeployClick} />
                   )}
 
                   <div ref={messagesEndRef} />
