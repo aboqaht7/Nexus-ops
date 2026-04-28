@@ -201,6 +201,87 @@ paths:
               schema:
                 $ref: "#/components/schemas/BotsStats"
 
+  /bots/import/github:
+    post:
+      operationId: importBotFromGithub
+      tags: [bots]
+      summary: Import a bot by cloning a GitHub repository
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportGithubBody"
+      responses:
+        "201":
+          description: Bot imported
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bots/import/url:
+    post:
+      operationId: importBotFromUrl
+      tags: [bots]
+      summary: Import a bot by downloading a file from a URL (e.g. Replit raw file)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportUrlBody"
+      responses:
+        "201":
+          description: Bot imported
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bots/{id}/export/github:
+    post:
+      operationId: exportBotToGithub
+      tags: [bots]
+      summary: Push a bot file to a GitHub repository
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExportGithubBody"
+      responses:
+        "200":
+          description: Export result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportGithubResult"
+        "404":
+          description: Bot not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -303,3 +384,71 @@ components:
           type: string
       required:
         - error
+
+    ImportGithubBody:
+      type: object
+      properties:
+        name:
+          type: string
+        repoUrl:
+          type: string
+        mainFile:
+          type: string
+        branch:
+          type: string
+        token:
+          type: string
+      required:
+        - name
+        - repoUrl
+        - mainFile
+
+    ImportUrlBody:
+      type: object
+      properties:
+        name:
+          type: string
+        fileUrl:
+          type: string
+      required:
+        - name
+        - fileUrl
+
+    ImportResult:
+      type: object
+      properties:
+        bot:
+          $ref: "#/components/schemas/Bot"
+        message:
+          type: string
+      required:
+        - bot
+        - message
+
+    ExportGithubBody:
+      type: object
+      properties:
+        repoUrl:
+          type: string
+        token:
+          type: string
+        path:
+          type: string
+        commitMessage:
+          type: string
+      required:
+        - repoUrl
+        - token
+
+    ExportGithubResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        url:
+          type: string
+        message:
+          type: string
+      required:
+        - success
+        - message

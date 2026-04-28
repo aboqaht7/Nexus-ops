@@ -21,11 +21,16 @@ import type {
   BotLogs,
   BotsStats,
   ErrorResponse,
+  ExportGithubBody,
+  ExportGithubResult,
   HealthStatus,
+  ImportGithubBody,
+  ImportResult,
+  ImportUrlBody,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
-import type { ErrorType } from "../custom-fetch";
+import type { ErrorType, BodyType } from "../custom-fetch";
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -747,3 +752,262 @@ export function useGetBotsStats<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Import a bot by cloning a GitHub repository
+ */
+export const getImportBotFromGithubUrl = () => {
+  return `/api/bots/import/github`;
+};
+
+export const importBotFromGithub = async (
+  importGithubBody: ImportGithubBody,
+  options?: RequestInit,
+): Promise<ImportResult> => {
+  return customFetch<ImportResult>(getImportBotFromGithubUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(importGithubBody),
+  });
+};
+
+export const getImportBotFromGithubMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof importBotFromGithub>>,
+    TError,
+    { data: BodyType<ImportGithubBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof importBotFromGithub>>,
+  TError,
+  { data: BodyType<ImportGithubBody> },
+  TContext
+> => {
+  const mutationKey = ["importBotFromGithub"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof importBotFromGithub>>,
+    { data: BodyType<ImportGithubBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return importBotFromGithub(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ImportBotFromGithubMutationResult = NonNullable<
+  Awaited<ReturnType<typeof importBotFromGithub>>
+>;
+export type ImportBotFromGithubMutationBody = BodyType<ImportGithubBody>;
+export type ImportBotFromGithubMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Import a bot by cloning a GitHub repository
+ */
+export const useImportBotFromGithub = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof importBotFromGithub>>,
+    TError,
+    { data: BodyType<ImportGithubBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof importBotFromGithub>>,
+  TError,
+  { data: BodyType<ImportGithubBody> },
+  TContext
+> => {
+  return useMutation(getImportBotFromGithubMutationOptions(options));
+};
+
+/**
+ * @summary Import a bot by downloading a file from a URL (e.g. Replit raw file)
+ */
+export const getImportBotFromUrlUrl = () => {
+  return `/api/bots/import/url`;
+};
+
+export const importBotFromUrl = async (
+  importUrlBody: ImportUrlBody,
+  options?: RequestInit,
+): Promise<ImportResult> => {
+  return customFetch<ImportResult>(getImportBotFromUrlUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(importUrlBody),
+  });
+};
+
+export const getImportBotFromUrlMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof importBotFromUrl>>,
+    TError,
+    { data: BodyType<ImportUrlBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof importBotFromUrl>>,
+  TError,
+  { data: BodyType<ImportUrlBody> },
+  TContext
+> => {
+  const mutationKey = ["importBotFromUrl"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof importBotFromUrl>>,
+    { data: BodyType<ImportUrlBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return importBotFromUrl(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ImportBotFromUrlMutationResult = NonNullable<
+  Awaited<ReturnType<typeof importBotFromUrl>>
+>;
+export type ImportBotFromUrlMutationBody = BodyType<ImportUrlBody>;
+export type ImportBotFromUrlMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Import a bot by downloading a file from a URL (e.g. Replit raw file)
+ */
+export const useImportBotFromUrl = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof importBotFromUrl>>,
+    TError,
+    { data: BodyType<ImportUrlBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof importBotFromUrl>>,
+  TError,
+  { data: BodyType<ImportUrlBody> },
+  TContext
+> => {
+  return useMutation(getImportBotFromUrlMutationOptions(options));
+};
+
+/**
+ * @summary Push a bot file to a GitHub repository
+ */
+export const getExportBotToGithubUrl = (id: string) => {
+  return `/api/bots/${id}/export/github`;
+};
+
+export const exportBotToGithub = async (
+  id: string,
+  exportGithubBody: ExportGithubBody,
+  options?: RequestInit,
+): Promise<ExportGithubResult> => {
+  return customFetch<ExportGithubResult>(getExportBotToGithubUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(exportGithubBody),
+  });
+};
+
+export const getExportBotToGithubMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof exportBotToGithub>>,
+    TError,
+    { id: string; data: BodyType<ExportGithubBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof exportBotToGithub>>,
+  TError,
+  { id: string; data: BodyType<ExportGithubBody> },
+  TContext
+> => {
+  const mutationKey = ["exportBotToGithub"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof exportBotToGithub>>,
+    { id: string; data: BodyType<ExportGithubBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return exportBotToGithub(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ExportBotToGithubMutationResult = NonNullable<
+  Awaited<ReturnType<typeof exportBotToGithub>>
+>;
+export type ExportBotToGithubMutationBody = BodyType<ExportGithubBody>;
+export type ExportBotToGithubMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Push a bot file to a GitHub repository
+ */
+export const useExportBotToGithub = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof exportBotToGithub>>,
+    TError,
+    { id: string; data: BodyType<ExportGithubBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof exportBotToGithub>>,
+  TError,
+  { id: string; data: BodyType<ExportGithubBody> },
+  TContext
+> => {
+  return useMutation(getExportBotToGithubMutationOptions(options));
+};

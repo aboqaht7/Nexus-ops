@@ -13,7 +13,7 @@ import {
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Play, Square, RotateCw, Trash2, TerminalSquare, AlertTriangle, FileCode2 } from "lucide-react";
+import { Play, Square, RotateCw, Trash2, TerminalSquare, AlertTriangle, FileCode2, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -26,6 +26,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { ExportGithubDialog } from "./export-github-dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface BotCardProps {
   bot: Bot;
@@ -88,9 +90,29 @@ export function BotCard({ bot }: BotCardProps) {
           </div>
         </div>
         
-        <Link href={`/bots/${bot.id}/logs`} className="text-muted-foreground hover:text-primary transition-colors bg-secondary/50 hover:bg-secondary p-2 rounded-md">
-          <TerminalSquare className="w-4 h-4" />
-        </Link>
+        <div className="flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <a href={`/api/bots/${bot.id}/download`} download>
+                <Button variant="ghost" size="sm" className="px-2 text-muted-foreground hover:text-foreground">
+                  <Download className="w-4 h-4" />
+                </Button>
+              </a>
+            </TooltipTrigger>
+            <TooltipContent>Download file</TooltipContent>
+          </Tooltip>
+
+          <ExportGithubDialog botId={bot.id} botName={bot.name} botFilename={bot.filename} />
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link href={`/bots/${bot.id}/logs`} className="text-muted-foreground hover:text-primary transition-colors bg-secondary/50 hover:bg-secondary p-2 rounded-md">
+                <TerminalSquare className="w-4 h-4" />
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent>View logs</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 my-4 p-3 bg-muted/30 rounded-lg border border-border/50 text-sm">

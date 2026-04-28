@@ -68,3 +68,34 @@ export interface BotsStats {
 export interface ErrorResponse {
   error: string;
 }
+
+export interface ImportGithubBody {
+  name: string;
+  repoUrl: string;
+  mainFile: string;
+  branch?: string;
+  token?: string;
+}
+
+export interface ImportUrlBody {
+  name: string;
+  fileUrl: string;
+}
+
+export interface ImportResult {
+  bot: Bot;
+  message: string;
+}
+
+export interface ExportGithubBody {
+  repoUrl: string;
+  token: string;
+  path?: string;
+  commitMessage?: string;
+}
+
+export interface ExportGithubResult {
+  success: boolean;
+  url?: string;
+  message: string;
+}

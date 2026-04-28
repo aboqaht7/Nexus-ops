@@ -148,3 +148,42 @@ export const GetBotsStatsResponse = zod.object({
   crashed: zod.number(),
   totalRestarts: zod.number(),
 });
+
+/**
+ * @summary Import a bot by cloning a GitHub repository
+ */
+export const ImportBotFromGithubBody = zod.object({
+  name: zod.string(),
+  repoUrl: zod.string(),
+  mainFile: zod.string(),
+  branch: zod.string().optional(),
+  token: zod.string().optional(),
+});
+
+/**
+ * @summary Import a bot by downloading a file from a URL (e.g. Replit raw file)
+ */
+export const ImportBotFromUrlBody = zod.object({
+  name: zod.string(),
+  fileUrl: zod.string(),
+});
+
+/**
+ * @summary Push a bot file to a GitHub repository
+ */
+export const ExportBotToGithubParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const ExportBotToGithubBody = zod.object({
+  repoUrl: zod.string(),
+  token: zod.string(),
+  path: zod.string().optional(),
+  commitMessage: zod.string().optional(),
+});
+
+export const ExportBotToGithubResponse = zod.object({
+  success: zod.boolean(),
+  url: zod.string().optional(),
+  message: zod.string(),
+});
