@@ -225,7 +225,7 @@ export default function BotEditor() {
   const tabs: { id: ActiveTab; label: string; icon: React.ReactNode; badge?: React.ReactNode }[] = [
     {
       id: "console",
-      label: "Console",
+      label: "السجلات",
       icon: <Terminal className="w-3.5 h-3.5" />,
       badge: sseConnected ? (
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -233,12 +233,12 @@ export default function BotEditor() {
     },
     {
       id: "terminal",
-      label: "Terminal",
+      label: "تيرمينال",
       icon: <Terminal className="w-3.5 h-3.5" />,
     },
     {
       id: "secrets",
-      label: "Secrets",
+      label: "الأسرار",
       icon: <KeyRound className="w-3.5 h-3.5" />,
       badge: envRows.length > 0 ? (
         <span className="text-[10px] bg-primary/20 text-primary rounded px-1">{envRows.length}</span>
@@ -246,7 +246,7 @@ export default function BotEditor() {
     },
     {
       id: "packages",
-      label: "Packages",
+      label: "الحزم",
       icon: <PackageSearch className="w-3.5 h-3.5" />,
     },
   ];
@@ -282,7 +282,7 @@ export default function BotEditor() {
             disabled={saveFile.isPending || !isDirty}
           >
             {saveFile.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-            {isDirty ? "Save*" : "Saved"}
+            {isDirty ? "حفظ*" : "محفوظ"}
           </Button>
 
           {!isRunning ? (
@@ -292,7 +292,7 @@ export default function BotEditor() {
               onClick={() => handleBotAction(startBot, "Bot started")}
               disabled={startBot.isPending}
             >
-              <Play className="w-3.5 h-3.5" />Run
+              <Play className="w-3.5 h-3.5" />تشغيل
             </Button>
           ) : (
             <Button
@@ -302,7 +302,7 @@ export default function BotEditor() {
               onClick={() => handleBotAction(stopBot, "Bot stopped")}
               disabled={stopBot.isPending}
             >
-              <Square className="w-3.5 h-3.5" />Stop
+              <Square className="w-3.5 h-3.5" />إيقاف
             </Button>
           )}
 
@@ -381,16 +381,16 @@ export default function BotEditor() {
             <div className="flex-1 min-h-0 bg-[#0c0c0e] flex flex-col">
               <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/5 flex-shrink-0">
                 <span className="text-[10px] font-mono text-zinc-500">
-                  {sseConnected ? "● live" : "○ connecting..."}
+                  {sseConnected ? "● مباشر" : "○ جاري الاتصال..."}
                 </span>
                 <button onClick={() => setLogs([])} className="text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors">
-                  Clear
+                  مسح
                 </button>
               </div>
               <ScrollArea className="flex-1">
                 <div className="p-3 font-mono text-xs space-y-0.5">
                   {logs.length === 0 && (
-                    <p className="text-zinc-600 py-4 text-center text-[11px]">Start your bot to see logs...</p>
+                    <p className="text-zinc-600 py-4 text-center text-[11px]">شغّل البوت لرؤية السجلات...</p>
                   )}
                   {logs.map((log, i) => (
                     <div
@@ -426,14 +426,14 @@ export default function BotEditor() {
               <ScrollArea className="flex-1">
                 <div className="p-3 space-y-2">
                   <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-                    Environment variables injected at startup. Use{" "}
-                    <code className="bg-muted px-1 rounded text-[11px]">process.env.KEY</code> (JS) or{" "}
-                    <code className="bg-muted px-1 rounded text-[11px]">os.environ.get('KEY')</code> (Python).
+                    متغيرات البيئة تُحقن عند بدء التشغيل. استخدم{" "}
+                    <code className="bg-muted px-1 rounded text-[11px]">process.env.KEY</code> في JS أو{" "}
+                    <code className="bg-muted px-1 rounded text-[11px]">os.environ.get('KEY')</code> في Python.
                   </p>
                   {envRows.length === 0 && (
                     <div className="py-6 text-center text-muted-foreground">
                       <KeyRound className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                      <p className="text-xs">No secrets yet</p>
+                      <p className="text-xs">لا توجد أسرار بعد</p>
                     </div>
                   )}
                   {envRows.map((row, i) => (
@@ -466,7 +466,7 @@ export default function BotEditor() {
                     </div>
                   ))}
                   <Button variant="outline" size="sm" className="w-full h-7 text-xs mt-2" onClick={addEnvRow}>
-                    <Plus className="w-3.5 h-3.5 mr-1.5" />Add Secret
+                    <Plus className="w-3.5 h-3.5 ml-1.5" />إضافة سر
                   </Button>
                 </div>
               </ScrollArea>
@@ -475,12 +475,12 @@ export default function BotEditor() {
                   {saveEnv.isPending ? (
                     <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                   ) : (
-                    <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                    <CheckCircle2 className="w-3.5 h-3.5 ml-1.5" />
                   )}
-                  Save Secrets
+                  حفظ الأسرار
                 </Button>
                 <p className="text-[10px] text-muted-foreground text-center mt-1.5">
-                  Restart bot to apply new secrets
+                  أعد تشغيل البوت لتطبيق الأسرار الجديدة
                 </p>
               </div>
             </div>

@@ -13,6 +13,7 @@ import AgentPage from "@/pages/agent";
 import BotEditor from "@/pages/bot-editor";
 import SignInPage from "@/pages/sign-in";
 import SignUpPage from "@/pages/sign-up";
+import Pricing from "@/pages/pricing";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -65,6 +66,7 @@ function Router() {
       <Route path="/agent" component={() => <Protected component={AgentPage} />} />
       <Route path="/bots/:id/logs" component={() => <Protected component={BotLogs} />} />
       <Route path="/bots/:id/editor" component={() => <Protected component={BotEditor} />} />
+      <Route path="/pricing" component={Pricing} />
       <Route path="/sign-in/*?" component={SignInPage} />
       <Route path="/sign-up/*?" component={SignUpPage} />
       <Route component={NotFound} />
@@ -99,7 +101,7 @@ function App() {
     <ClerkProvider
       publishableKey={clerkPubKey}
       {...(clerkProxyUrl ? { proxyUrl: clerkProxyUrl } : {})}
-      appearance={{ theme: dark }}
+      appearance={{}}
       routerPush={(to) => window.history.pushState(null, "", stripBase(to))}
       routerReplace={(to) => window.history.replaceState(null, "", stripBase(to))}
     >

@@ -16,70 +16,70 @@ const R = {
 };
 
 const botTypes = [
-  { icon: <Bot className="w-4 h-4" />, label: "Moderation" },
-  { icon: <Music className="w-4 h-4" />, label: "Music" },
-  { icon: <Star className="w-4 h-4" />, label: "Leveling" },
-  { icon: <Gift className="w-4 h-4" />, label: "Giveaway" },
-  { icon: <Ticket className="w-4 h-4" />, label: "Tickets" },
-  { icon: <Hash className="w-4 h-4" />, label: "Logging" },
+  { icon: <Bot className="w-4 h-4" />, label: "تحكيم" },
+  { icon: <Music className="w-4 h-4" />, label: "موسيقى" },
+  { icon: <Star className="w-4 h-4" />, label: "مستويات" },
+  { icon: <Gift className="w-4 h-4" />, label: "هبات" },
+  { icon: <Ticket className="w-4 h-4" />, label: "تذاكر" },
+  { icon: <Hash className="w-4 h-4" />, label: "سجلات" },
 ];
 
 const examplePrompts = [
-  "A bot that auto-bans spammers",
-  "A music bot with playlist support",
-  "A leveling system with XP roles",
+  "بوت يحظر المزعجين تلقائياً",
+  "بوت موسيقى مع دعم قوائم التشغيل",
+  "نظام مستويات مع XP وأدوار",
 ];
 
 const features = [
   {
-    tag: "Always On",
-    title: "Your bots run\n24/7 without interruption",
-    desc: "Auto-restart on crash, exponential backoff recovery, and real-time uptime monitoring — your bots stay alive around the clock.",
+    tag: "يعمل دائماً",
+    title: "بوتاتك تعمل\n24/7 بدون انقطاع",
+    desc: "إعادة تشغيل تلقائية عند التعطل، واسترداد تدريجي، ومراقبة وقت التشغيل في الوقت الفعلي — بوتاتك لن تتوقف.",
     bg: "#1A1A2E",
     textColor: "#FFFFFF",
     accent: R.orange,
     big: true,
   },
   {
-    tag: "Code Editor",
-    title: "VS Code in your browser",
-    desc: "Monaco editor with full syntax highlighting, IntelliSense, and multi-language support for JS and Python.",
+    tag: "محرر الكود",
+    title: "VS Code في متصفحك",
+    desc: "محرر Monaco مع تلوين كامل للكود، IntelliSense، ودعم JavaScript و Python.",
     bg: "#F0EAE3",
     textColor: R.text,
     accent: R.orange,
     big: false,
   },
   {
-    tag: "Terminal",
-    title: "Full bash terminal",
-    desc: "Real xterm.js terminal connected to a live shell. Run npm install, debug live, execute any command.",
+    tag: "تيرمينال",
+    title: "تيرمينال bash حقيقي",
+    desc: "تيرمينال xterm.js متصل بشيل حي. نفّذ npm install، تتبع الأخطاء، وأدر أي أمر.",
     bg: "#0D1117",
     textColor: "#4ADE80",
     accent: "#4ADE80",
     big: false,
   },
   {
-    tag: "Secrets",
-    title: "Secure environment\nvariables",
-    desc: "Per-bot secrets management. Store your BOT_TOKEN and other sensitive keys safely — never exposed in code.",
+    tag: "الأسرار",
+    title: "متغيرات بيئة\nآمنة ومشفرة",
+    desc: "إدارة أسرار مستقلة لكل بوت. خزّن BOT_TOKEN وكل المفاتيح الحساسة بأمان بعيداً عن الكود.",
     bg: R.orangeLight,
     textColor: R.text,
     accent: R.orange,
     big: false,
   },
   {
-    tag: "AI Agent",
-    title: "Agent-4 writes bots for you",
-    desc: "Describe what you need in plain English. Agent-4 generates complete, production-ready Discord bots with a single prompt.",
+    tag: "ذكاء اصطناعي",
+    title: "Agent-4 يكتب البوتات عنك",
+    desc: "اوصف ما تريده بالعربي. Agent-4 يولّد بوتات Discord كاملة وجاهزة للإنتاج بأمر واحد.",
     bg: "#EEF2FF",
     textColor: "#1E1B4B",
     accent: "#6366F1",
     big: false,
   },
   {
-    tag: "Packages",
-    title: "npm & pip package manager",
-    desc: "Install any package directly from the browser. Real-time installation output, zero configuration required.",
+    tag: "الحزم",
+    title: "مدير حزم npm و pip",
+    desc: "ثبّت أي حزمة مباشرة من المتصفح. مخرجات تثبيت مباشرة، لا إعداد مطلوب.",
     bg: "#F0FDF4",
     textColor: "#14532D",
     accent: "#16A34A",
@@ -89,19 +89,19 @@ const features = [
 
 const plans = [
   {
-    name: "Starter",
-    price: "Free",
-    sub: "For getting started",
-    items: ["Unlimited bots", "Monaco code editor", "Real-time logs", "Community support"],
-    cta: "Sign up",
+    name: "الأساسية",
+    price: "مجاني",
+    sub: "للبدء وتجربة المنصة",
+    items: ["بوتات غير محدودة", "محرر Monaco", "سجلات مباشرة", "دعم المجتمع"],
+    cta: "إنشاء حساب",
     highlight: false,
   },
   {
-    name: "NexusOps Core",
-    price: "$0",
-    sub: "Everything free, forever",
-    items: ["Everything in Starter", "Live terminal access", "npm / pip packages", "Secrets manager", "GitHub sync", "Agent-4 AI assistant"],
-    cta: "Get started",
+    name: "NexusOps Pro",
+    price: "$10",
+    sub: "شهرياً للمشاريع الجادة",
+    items: ["كل مميزات الأساسية", "تيرمينال حي", "مدير npm/pip", "أسرار مشفرة", "مزامنة GitHub", "Agent-4 AI"],
+    cta: "اشترك الآن",
     highlight: true,
   },
 ];
@@ -153,12 +153,20 @@ export default function Home() {
           {/* Nav right */}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Link
+              href={`${base}/pricing`}
+              style={{ padding: "7px 14px", fontSize: 14, fontWeight: 500, color: R.muted, textDecoration: "none", borderRadius: 8 }}
+              onMouseEnter={e => { e.currentTarget.style.color = R.text; e.currentTarget.style.background = R.bgChip; }}
+              onMouseLeave={e => { e.currentTarget.style.color = R.muted; e.currentTarget.style.background = "transparent"; }}
+            >
+              الأسعار
+            </Link>
+            <Link
               href={`${base}/sign-in`}
-              style={{ padding: "7px 16px", fontSize: 14, fontWeight: 500, color: R.text, textDecoration: "none", borderRadius: 8 }}
+              style={{ padding: "7px 14px", fontSize: 14, fontWeight: 500, color: R.text, textDecoration: "none", borderRadius: 8 }}
               onMouseEnter={e => (e.currentTarget.style.background = R.bgChip)}
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
             >
-              Log in
+              تسجيل الدخول
             </Link>
             <Link
               href={`${base}/sign-up`}
@@ -171,7 +179,7 @@ export default function Home() {
               onMouseEnter={e => { e.currentTarget.style.background = R.orange; e.currentTarget.style.color = "#fff"; }}
               onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = R.orange; }}
             >
-              Create account
+              إنشاء حساب
             </Link>
           </div>
         </div>
@@ -186,10 +194,10 @@ export default function Home() {
           letterSpacing: "-0.02em",
           color: R.text, marginBottom: 20,
         }}>
-          What bot will you build?
+          ما البوت الذي ستبنيه؟
         </h1>
-        <p style={{ fontSize: 18, color: R.muted, marginBottom: 36, lineHeight: 1.6, maxWidth: 520, margin: "0 auto 36px" }}>
-          Deploy Discord bots in seconds — no server needed. Edit code, manage secrets, and go live 24/7 from your browser.
+        <p style={{ fontSize: 18, color: R.muted, marginBottom: 36, lineHeight: 1.7, maxWidth: 520, margin: "0 auto 36px" }}>
+          انشر بوتات Discord في ثوانٍ — بدون سيرفر. عدّل الكود، وأدر الأسرار، وانطلق 24/7 من متصفحك.
         </p>
 
         {/* Prompt input */}
@@ -216,7 +224,7 @@ export default function Home() {
             value={prompt}
             onChange={e => setPrompt(e.target.value)}
             onKeyDown={e => e.key === "Enter" && handlePromptSubmit()}
-            placeholder="Describe your bot idea, or start from a template..."
+            placeholder="اوصف فكرة بوتك، أو ابدأ من قالب جاهز..."
             style={{
               flex: 1, border: "none", outline: "none",
               fontSize: 15, color: R.text, background: "transparent",
@@ -276,7 +284,7 @@ export default function Home() {
             onClick={cyclePrompt}
             style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, color: R.muted, background: "none", border: "none", cursor: "pointer" }}
           >
-            <RefreshCw size={12} /> Try an example prompt
+            <RefreshCw size={12} /> جرّب مثالاً
           </button>
           {examplePrompts.map((p, i) => (
             <button
@@ -297,7 +305,7 @@ export default function Home() {
       {/* ── Social proof ───────────────────────────────────────────── */}
       <section style={{ textAlign: "center", padding: "20px 24px 60px", borderTop: `1px solid ${R.border}` }}>
         <p style={{ fontSize: 13, color: R.muted, marginBottom: 28, letterSpacing: "0.05em", textTransform: "uppercase", fontWeight: 500 }}>
-          Works with your favorite tools
+          يعمل مع أدواتك المفضلة
         </p>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 48, flexWrap: "wrap", opacity: 0.5 }}>
           {["discord.js", "discord.py", "Node.js", "Python 3", "npm", "pip"].map(l => (
@@ -309,7 +317,7 @@ export default function Home() {
       {/* ── Features bento grid ────────────────────────────────────── */}
       <section style={{ maxWidth: 1100, margin: "0 auto", padding: "60px 24px" }}>
         <p style={{ textAlign: "center", fontSize: 13, fontWeight: 600, color: R.orange, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 14 }}>
-          PLATFORM FEATURES
+          مميزات المنصة
         </p>
         <h2 style={{
           textAlign: "center",
@@ -318,7 +326,7 @@ export default function Home() {
           fontWeight: 600, color: R.text,
           marginBottom: 48, lineHeight: 1.15,
         }}>
-          Everything you need to run bots
+          كل ما تحتاجه لتشغيل بوتاتك
         </h2>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
@@ -364,9 +372,9 @@ export default function Home() {
           fontFamily: "'Fraunces', serif",
           fontSize: "clamp(32px, 4vw, 48px)",
           fontWeight: 600, color: R.text, marginBottom: 12,
-        }}>Pricing</h2>
+        }}>الأسعار</h2>
         <p style={{ textAlign: "center", fontSize: 16, color: R.muted, marginBottom: 48 }}>
-          Choose the best plan for you.
+          اختر الخطة المناسبة لك.
         </p>
 
         <div style={{ display: "flex", gap: 20, maxWidth: 780, margin: "0 auto", justifyContent: "center", flexWrap: "wrap" }}>
