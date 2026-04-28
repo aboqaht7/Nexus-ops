@@ -7,11 +7,14 @@ declare global {
     Moyasar: {
       init: (config: Record<string, unknown>) => void;
     };
+    ApplePaySession?: {
+      canMakePayments: () => boolean;
+      supportsVersion: (v: number) => boolean;
+    };
   }
 }
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
-// Use test key in development, live key in production
 const MOYASAR_KEY = (
   import.meta.env.DEV
     ? import.meta.env.VITE_MOYASAR_TEST_KEY
@@ -30,8 +33,6 @@ const R = {
   purple: "#7C3AED",
   purpleLight: "#F5F3FF",
 };
-
-/* ─── Plan config ─────────────────────────────────────────────────── */
 
 interface PlanInfo {
   nameAr: string;
@@ -89,6 +90,194 @@ function getParams() {
   return { plan, billing };
 }
 
+/* ─── Detect Apple Pay support ───────────────────────────────────────── */
+function applePaySupported(): boolean {
+  try {
+    return !!(
+      window.ApplePaySession &&
+      window.ApplePaySession.supportsVersion(3) &&
+      window.ApplePaySession.canMakePayments()
+    );
+  } catch {
+    return false;
+  }
+}
+
+/* ─── Moyasar form sub-component — remounts on key change ───────────── */
+interface MoyasarFormProps {
+  amount: number;
+  description: string;
+  planKey: string;
+  billing: string;
+  planName: string;
+  accentColor: string;
+  accentLight: string;
+}
+
+function MoyasarForm({ amount, description, planKey, billing, planName, accentColor, accentLight }: MoyasarFormProps) {
+  const [status, setStatus] = useState<"loading-sdk" | "ready" | "error">("loading-sdk");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const initialized = useRef(false);
+  const formId = `mysr-${planKey}-${billing}`;
+
+  /* Load Moyasar SDK once */
+  useEffect(() => {
+    const loadSdk = () => {
+      if (window.Moyasar) { setStatus("ready"); return; }
+
+      if (!document.getElementById("moyasar-css")) {
+        const link = document.createElement("link");
+        link.id = "moyasar-css";
+        link.rel = "stylesheet";
+        link.href = "https://cdn.moyasar.com/mpf/1.14.0/moyasar.css";
+        document.head.appendChild(link);
+      }
+
+      if (document.getElementById("moyasar-js")) {
+        if (window.Moyasar) setStatus("ready");
+        else {
+          const existing = document.getElementById("moyasar-js") as HTMLScriptElement;
+          existing.addEventListener("load", () => setStatus("ready"), { once: true });
+        }
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.id = "moyasar-js";
+      script.src = "https://cdn.moyasar.com/mpf/1.14.0/moyasar.js";
+      script.async = true;
+      script.onload = () => setStatus("ready");
+      script.onerror = () => {
+        setStatus("error");
+        setErrorMsg("تعذّر تحميل بوابة الدفع. تحقق من اتصالك بالإنترنت.");
+      };
+      document.head.appendChild(script);
+    };
+
+    loadSdk();
+  }, []);
+
+  /* Init Moyasar when SDK is ready */
+  useEffect(() => {
+    if (status !== "ready" || initialized.current) return;
+    if (!window.Moyasar) return;
+    if (!MOYASAR_KEY) {
+      setStatus("error");
+      setErrorMsg("مفتاح ميسر غير مضبوط — يرجى التحقق من إعدادات المشروع.");
+      return;
+    }
+
+    initialized.current = true;
+
+    // Build allowed payment methods — only include Apple Pay if device supports it
+    const methods: string[] = ["creditcard", "stcpay"];
+    if (applePaySupported()) methods.unshift("applepay");
+
+    // Ensure callback URL uses current origin (HTTPS in production)
+    const callbackUrl = `${window.location.origin}${base}/payment-success?plan=${planKey}&billing=${billing}`;
+
+    const config: Record<string, unknown> = {
+      element: `#${formId}`,
+      amount,
+      currency: "SAR",
+      description,
+      publishable_api_key: MOYASAR_KEY,
+      callback_url: callbackUrl,
+      methods,
+      on_failure: (error: unknown) => {
+        console.error("Moyasar payment failure:", error);
+      },
+    };
+
+    // Add Apple Pay config only if supported
+    if (applePaySupported()) {
+      config.apple_pay = {
+        country: "SA",
+        label: planName,
+        validate_merchant_url: "https://api.moyasar.com/v1/applepay/initiate",
+      };
+    }
+
+    try {
+      window.Moyasar.init(config);
+    } catch (err) {
+      console.error("Moyasar init error:", err);
+      setStatus("error");
+      setErrorMsg("حدث خطأ أثناء تهيئة بوابة الدفع.");
+    }
+  }, [status, amount, description, planKey, billing, planName, formId]);
+
+  if (status === "error") {
+    return (
+      <div style={{ padding: 16, background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 10, color: "#DC2626", fontSize: 13, lineHeight: 1.6 }}>
+        {errorMsg}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {status === "loading-sdk" && (
+        <div style={{ padding: 32, textAlign: "center", color: R.muted, fontSize: 14 }}>
+          <div style={{ width: 32, height: 32, border: `3px solid ${R.border}`, borderTopColor: accentColor, borderRadius: "50%", margin: "0 auto 12px", animation: "spin 0.8s linear infinite" }} />
+          جاري تحميل بوابة الدفع...
+        </div>
+      )}
+
+      <div id={formId} />
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #${formId} input, #${formId} select {
+          font-family: 'Cairo', 'Inter', sans-serif !important;
+          border-radius: 10px !important;
+          border: 1.5px solid ${R.border} !important;
+          background: ${R.bg} !important;
+          font-size: 14px !important;
+          padding: 10px 12px !important;
+        }
+        #${formId} input:focus, #${formId} select:focus {
+          border-color: ${accentColor} !important;
+          outline: none !important;
+          box-shadow: 0 0 0 3px ${accentLight} !important;
+        }
+        #${formId} button[type="submit"] {
+          background: ${accentColor} !important;
+          border-radius: 10px !important;
+          font-family: 'Cairo', 'Inter', sans-serif !important;
+          font-size: 15px !important;
+          font-weight: 700 !important;
+          padding: 12px !important;
+          width: 100% !important;
+          border: none !important;
+          color: white !important;
+          cursor: pointer !important;
+          margin-top: 8px !important;
+        }
+        #${formId} button[type="submit"]:hover {
+          opacity: 0.9 !important;
+        }
+        #${formId} label {
+          font-family: 'Cairo', 'Inter', sans-serif !important;
+          font-size: 13px !important;
+          font-weight: 600 !important;
+          color: ${R.text} !important;
+        }
+        #${formId} .mysr-method-tab {
+          border-radius: 10px !important;
+          border: 1.5px solid ${R.border} !important;
+        }
+        #${formId} .mysr-method-tab.active {
+          border-color: ${accentColor} !important;
+          background: ${accentLight} !important;
+        }
+      `}</style>
+    </>
+  );
+}
+
+/* ─── Main page ──────────────────────────────────────────────────────── */
+
 export default function Checkout() {
   const { plan: planKey, billing } = getParams();
   const planInfo = PLANS[planKey] ?? PLANS.pro;
@@ -96,65 +285,11 @@ export default function Checkout() {
   const amountSar = isYearly ? planInfo.yearlySar : planInfo.monthlySar;
   const amountHalala = amountSar * 100;
 
-  const [sdkReady, setSdkReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const initialized = useRef(false);
-
-  const accentColor = planInfo.color;
+  const accentColor = planKey === "unlimited" ? R.purple : R.orange;
   const accentLight = planKey === "unlimited" ? R.purpleLight : R.orangeLight;
 
-  /* Load Moyasar SDK */
-  useEffect(() => {
-    if (document.getElementById("moyasar-css")) {
-      setSdkReady(!!window.Moyasar);
-    } else {
-      const link = document.createElement("link");
-      link.id = "moyasar-css";
-      link.rel = "stylesheet";
-      link.href = "https://cdn.moyasar.com/mpf/1.14.0/moyasar.css";
-      document.head.appendChild(link);
-    }
-
-    if (document.getElementById("moyasar-js")) {
-      if (window.Moyasar) setSdkReady(true);
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = "moyasar-js";
-    script.src = "https://cdn.moyasar.com/mpf/1.14.0/moyasar.js";
-    script.async = true;
-    script.onload = () => setSdkReady(true);
-    script.onerror = () => setError("تعذّر تحميل بوابة ميسر. تحقق من اتصالك بالإنترنت.");
-    document.head.appendChild(script);
-  }, []);
-
-  /* Init Moyasar form once SDK ready */
-  useEffect(() => {
-    if (!sdkReady || initialized.current) return;
-    if (!window.Moyasar) return;
-    if (!MOYASAR_KEY) {
-      setError("مفتاح ميسر غير مضبوط — يرجى إضافة VITE_MOYASAR_PUBLISHABLE_KEY في الإعدادات.");
-      return;
-    }
-
-    initialized.current = true;
-
-    window.Moyasar.init({
-      element: ".mysr-form",
-      amount: amountHalala,
-      currency: "SAR",
-      description: `${planInfo.nameAr} — اشتراك ${isYearly ? "سنوي" : "شهري"}`,
-      publishable_api_key: MOYASAR_KEY,
-      callback_url: `${window.location.origin}${base}/payment-success?plan=${planKey}&billing=${billing}`,
-      methods: ["creditcard", "applepay", "stcpay"],
-      apple_pay: {
-        country: "SA",
-        label: planInfo.nameAr,
-        validate_merchant_url: "https://api.moyasar.com/v1/applepay/initiate",
-      },
-    });
-  }, [sdkReady, amountHalala, planInfo, isYearly, planKey, billing]);
+  // Key changes whenever plan or billing changes → forces MoyasarForm to remount
+  const formKey = `${planKey}-${billing}`;
 
   return (
     <div style={{ minHeight: "100dvh", background: R.bg, fontFamily: "'Cairo', 'Inter', sans-serif", direction: "rtl" }}>
@@ -191,7 +326,7 @@ export default function Checkout() {
             {planInfo.nameAr} — اشتراك {isYearly ? "سنوي (وفّر شهرين)" : "شهري"} · يُلغى في أي وقت.
           </p>
 
-          {/* Billing toggle shortcut */}
+          {/* Billing toggle */}
           <div style={{ display: "inline-flex", alignItems: "center", gap: 0, background: R.bgChip, borderRadius: 99, padding: 3, marginBottom: 24 }}>
             <Link
               href={`${base}/checkout?plan=${planKey}&billing=monthly`}
@@ -249,13 +384,11 @@ export default function Checkout() {
               </div>
             )}
 
-            {/* Token info */}
             <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", background: accentLight, borderRadius: 8 }}>
               <Coins size={14} color={accentColor} />
               <span style={{ fontSize: 12, color: R.text, fontWeight: 600 }}>{planInfo.tokens}</span>
             </div>
 
-            {/* Features */}
             <div style={{ paddingTop: 16, display: "flex", flexDirection: "column", gap: 9 }}>
               {planInfo.features.map(f => (
                 <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: R.text }}>
@@ -284,23 +417,29 @@ export default function Checkout() {
           </div>
         </div>
 
-        {/* Right — Moyasar form */}
+        {/* Right — Payment form */}
         <div>
           <div style={{ background: R.bgCard, border: `1px solid ${R.border}`, borderRadius: 16, padding: 24, boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
             <p style={{ fontSize: 14, fontWeight: 600, color: R.text, marginBottom: 16 }}>بيانات الدفع</p>
 
-            {error ? (
-              <div style={{ padding: 16, background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 10, color: "#DC2626", fontSize: 13, lineHeight: 1.6 }}>
-                {error}
-              </div>
-            ) : !sdkReady ? (
-              <div style={{ padding: 32, textAlign: "center", color: R.muted, fontSize: 14 }}>
-                <div style={{ width: 32, height: 32, border: `3px solid ${R.border}`, borderTopColor: R.orange, borderRadius: "50%", margin: "0 auto 12px", animation: "spin 0.8s linear infinite" }} />
-                جاري تحميل بوابة الدفع...
-              </div>
-            ) : null}
+            {/* key forces full remount when plan or billing changes */}
+            <MoyasarForm
+              key={formKey}
+              amount={amountHalala}
+              description={`${planInfo.nameAr} — اشتراك ${isYearly ? "سنوي" : "شهري"}`}
+              planKey={planKey}
+              billing={billing}
+              planName={planInfo.nameAr}
+              accentColor={accentColor}
+              accentLight={accentLight}
+            />
 
-            <div className="mysr-form" />
+            {/* Apple Pay notice — only shown if NOT supported */}
+            {!applePaySupported() && (
+              <div style={{ marginTop: 12, padding: "8px 12px", background: "#FEF9EC", border: "1px solid #FDE68A", borderRadius: 8, fontSize: 11, color: "#92400E" }}>
+                💡 Apple Pay متاح فقط على Safari من أجهزة Apple
+              </div>
+            )}
 
             <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${R.border}` }}>
               <p style={{ fontSize: 11, color: R.muted, marginBottom: 10, textAlign: "center" }}>وسائل الدفع المقبولة</p>
@@ -321,53 +460,6 @@ export default function Checkout() {
           </div>
         </div>
       </div>
-
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .mysr-form input, .mysr-form select {
-          font-family: 'Cairo', 'Inter', sans-serif !important;
-          border-radius: 10px !important;
-          border: 1.5px solid ${R.border} !important;
-          background: ${R.bg} !important;
-          font-size: 14px !important;
-          padding: 10px 12px !important;
-        }
-        .mysr-form input:focus, .mysr-form select:focus {
-          border-color: ${R.orange} !important;
-          outline: none !important;
-          box-shadow: 0 0 0 3px ${R.orangeLight} !important;
-        }
-        .mysr-form button[type="submit"] {
-          background: ${R.orange} !important;
-          border-radius: 10px !important;
-          font-family: 'Cairo', 'Inter', sans-serif !important;
-          font-size: 15px !important;
-          font-weight: 700 !important;
-          padding: 12px !important;
-          width: 100% !important;
-          border: none !important;
-          color: white !important;
-          cursor: pointer !important;
-          margin-top: 8px !important;
-        }
-        .mysr-form button[type="submit"]:hover {
-          background: #D95600 !important;
-        }
-        .mysr-form label {
-          font-family: 'Cairo', 'Inter', sans-serif !important;
-          font-size: 13px !important;
-          font-weight: 600 !important;
-          color: ${R.text} !important;
-        }
-        .mysr-form .mysr-method-tab {
-          border-radius: 10px !important;
-          border: 1.5px solid ${R.border} !important;
-        }
-        .mysr-form .mysr-method-tab.active {
-          border-color: ${R.orange} !important;
-          background: ${R.orangeLight} !important;
-        }
-      `}</style>
     </div>
   );
 }
