@@ -7,7 +7,8 @@ import { logger } from "./logger";
 const DATA_DIR = join(process.cwd(), "data");
 const BOTS_FILE = join(DATA_DIR, "bots.json");
 const BOT_FILES_DIR = join(DATA_DIR, "bot-files");
-const MAX_LOG_ENTRIES = 200;
+const BOT_ENVS_DIR = join(DATA_DIR, "bot-envs");
+const MAX_LOG_ENTRIES = 500;
 const MAX_RESTART_DELAY_MS = 30_000;
 
 export type BotStatus = "running" | "stopped" | "crashed" | "starting";
@@ -41,9 +42,14 @@ interface RuntimeState {
 
 const runtimeStates = new Map<string, RuntimeState>();
 
+// SSE log subscribers: botId → set of callback functions
+type LogSubscriber = (entry: LogEntry) => void;
+const logSubscribers = new Map<string, Set<LogSubscriber>>();
+
 function ensureDirs() {
   if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
   if (!existsSync(BOT_FILES_DIR)) mkdirSync(BOT_FILES_DIR, { recursive: true });
+  if (!existsSync(BOT_ENVS_DIR)) mkdirSync(BOT_ENVS_DIR, { recursive: true });
 }
 
 function loadBots(): BotRecord[] {
@@ -72,10 +78,28 @@ function getRuntime(id: string): RuntimeState {
 
 function addLog(id: string, level: "info" | "error", message: string) {
   const state = getRuntime(id);
-  state.logs.push({ timestamp: new Date().toISOString(), level, message });
+  const entry: LogEntry = { timestamp: new Date().toISOString(), level, message };
+  state.logs.push(entry);
   if (state.logs.length > MAX_LOG_ENTRIES) {
     state.logs.splice(0, state.logs.length - MAX_LOG_ENTRIES);
   }
+  // Notify SSE subscribers
+  const subs = logSubscribers.get(id);
+  if (subs && subs.size > 0) {
+    for (const cb of subs) {
+      try { cb(entry); } catch { /* ignore closed connections */ }
+    }
+  }
+}
+
+export function subscribeToLogs(id: string, cb: LogSubscriber): () => void {
+  if (!logSubscribers.has(id)) {
+    logSubscribers.set(id, new Set());
+  }
+  logSubscribers.get(id)!.add(cb);
+  return () => {
+    logSubscribers.get(id)?.delete(cb);
+  };
 }
 
 export function getBotFilesDir(): string {
@@ -151,6 +175,7 @@ export function deleteBot(id: string): boolean {
   saveBots(bots);
 
   runtimeStates.delete(id);
+  logSubscribers.delete(id);
   logger.info({ botId: id }, "Bot deleted");
   return true;
 }
@@ -171,6 +196,48 @@ function getBotFilePath(filename: string): string {
   return join(BOT_FILES_DIR, filename);
 }
 
+function getBotEnvPath(id: string): string {
+  return join(BOT_ENVS_DIR, `${id}.json`);
+}
+
+// ── File content helpers ──────────────────────────────────────────────────────
+
+export function getBotFileContent(id: string): string | undefined {
+  const bot = getBot(id);
+  if (!bot) return undefined;
+  const filePath = getBotFilePath(bot.filename);
+  if (!existsSync(filePath)) return "";
+  return readFileSync(filePath, "utf-8");
+}
+
+export function setBotFileContent(id: string, content: string): boolean {
+  const bot = getBot(id);
+  if (!bot) return false;
+  const filePath = getBotFilePath(bot.filename);
+  writeFileSync(filePath, content, "utf-8");
+  addLog(id, "info", "File saved via editor");
+  return true;
+}
+
+// ── Env var helpers ───────────────────────────────────────────────────────────
+
+export function getBotEnv(id: string): Record<string, string> {
+  const path = getBotEnvPath(id);
+  if (!existsSync(path)) return {};
+  try {
+    return JSON.parse(readFileSync(path, "utf-8"));
+  } catch {
+    return {};
+  }
+}
+
+export function setBotEnv(id: string, vars: Record<string, string>): void {
+  ensureDirs();
+  writeFileSync(getBotEnvPath(id), JSON.stringify(vars, null, 2), "utf-8");
+}
+
+// ── Process management ────────────────────────────────────────────────────────
+
 function spawnBotProcess(bot: BotRecord, bots: BotRecord[]) {
   const state = getRuntime(bot.id);
 
@@ -183,11 +250,14 @@ function spawnBotProcess(bot: BotRecord, bots: BotRecord[]) {
   const cmd = bot.language === "python" ? "python3" : "node";
   const args = [filePath];
 
+  // Load bot-specific env vars and merge with system env
+  const botEnv = getBotEnv(bot.id);
+
   addLog(bot.id, "info", `Starting bot (cmd: ${cmd} ${filePath})`);
 
   const proc = spawn(cmd, args, {
     stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env },
+    env: { ...process.env, ...botEnv },
   });
 
   state.process = proc;

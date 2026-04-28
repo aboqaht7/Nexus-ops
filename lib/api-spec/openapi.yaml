@@ -255,6 +255,114 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /bots/{id}/file:
+    get:
+      operationId: getBotFile
+      tags: [bots]
+      summary: Get bot file content
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: File content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BotFileContent"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: saveBotFile
+      tags: [bots]
+      summary: Save bot file content
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BotFilePayload"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaveResult"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bots/{id}/env:
+    get:
+      operationId: getBotEnv
+      tags: [bots]
+      summary: Get bot environment variables
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Env vars
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BotEnvVars"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: setBotEnv
+      tags: [bots]
+      summary: Set bot environment variables
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BotEnvPayload"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaveResult"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /anthropic/conversations:
     get:
       operationId: listAnthropicConversations
@@ -688,6 +796,66 @@ components:
           type: string
       required:
         - error
+
+    BotFileContent:
+      type: object
+      properties:
+        content:
+          type: string
+      required:
+        - content
+
+    BotFilePayload:
+      type: object
+      properties:
+        content:
+          type: string
+      required:
+        - content
+
+    BotEnvVars:
+      type: object
+      properties:
+        vars:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+              value:
+                type: string
+            required:
+              - key
+              - value
+      required:
+        - vars
+
+    BotEnvPayload:
+      type: object
+      properties:
+        vars:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+              value:
+                type: string
+            required:
+              - key
+              - value
+      required:
+        - vars
+
+    SaveResult:
+      type: object
+      properties:
+        saved:
+          type: boolean
+      required:
+        - saved
 
     AgentDeployBody:
       type: object

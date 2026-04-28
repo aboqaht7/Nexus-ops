@@ -13,7 +13,7 @@ import {
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Play, Square, RotateCw, Trash2, TerminalSquare, AlertTriangle, FileCode2, Download } from "lucide-react";
+import { Play, Square, RotateCw, Trash2, TerminalSquare, AlertTriangle, FileCode2, Download, Code2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -103,6 +103,15 @@ export function BotCard({ bot }: BotCardProps) {
           </Tooltip>
 
           <ExportGithubDialog botId={bot.id} botName={bot.name} botFilename={bot.filename} />
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link href={`/bots/${bot.id}/editor`} className="text-muted-foreground hover:text-primary transition-colors bg-secondary/50 hover:bg-secondary p-2 rounded-md">
+                <Code2 className="w-4 h-4" />
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent>Edit code</TooltipContent>
+          </Tooltip>
 
           <Tooltip>
             <TooltipTrigger asChild>

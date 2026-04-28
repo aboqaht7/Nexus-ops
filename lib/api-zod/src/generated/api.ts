@@ -169,6 +169,68 @@ export const ImportBotFromUrlBody = zod.object({
 });
 
 /**
+ * @summary Get bot file content
+ */
+export const GetBotFileParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const GetBotFileResponse = zod.object({
+  content: zod.string(),
+});
+
+/**
+ * @summary Save bot file content
+ */
+export const SaveBotFileParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const SaveBotFileBody = zod.object({
+  content: zod.string(),
+});
+
+export const SaveBotFileResponse = zod.object({
+  saved: zod.boolean(),
+});
+
+/**
+ * @summary Get bot environment variables
+ */
+export const GetBotEnvParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const GetBotEnvResponse = zod.object({
+  vars: zod.array(
+    zod.object({
+      key: zod.string(),
+      value: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * @summary Set bot environment variables
+ */
+export const SetBotEnvParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const SetBotEnvBody = zod.object({
+  vars: zod.array(
+    zod.object({
+      key: zod.string(),
+      value: zod.string(),
+    }),
+  ),
+});
+
+export const SetBotEnvResponse = zod.object({
+  saved: zod.boolean(),
+});
+
+/**
  * @summary List all conversations
  */
 export const ListAnthropicConversationsResponseItem = zod.object({

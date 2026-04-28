@@ -136,6 +136,36 @@ export interface AnthropicError {
   error: string;
 }
 
+export interface BotFileContent {
+  content: string;
+}
+
+export interface BotFilePayload {
+  content: string;
+}
+
+export type BotEnvVarsVarsItem = {
+  key: string;
+  value: string;
+};
+
+export interface BotEnvVars {
+  vars: BotEnvVarsVarsItem[];
+}
+
+export type BotEnvPayloadVarsItem = {
+  key: string;
+  value: string;
+};
+
+export interface BotEnvPayload {
+  vars: BotEnvPayloadVarsItem[];
+}
+
+export interface SaveResult {
+  saved: boolean;
+}
+
 export type AgentDeployBodyLanguage =
   (typeof AgentDeployBodyLanguage)[keyof typeof AgentDeployBodyLanguage];
 

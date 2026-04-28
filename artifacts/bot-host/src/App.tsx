@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Dashboard from "@/pages/dashboard";
 import BotLogs from "@/pages/bot-logs";
 import AgentPage from "@/pages/agent";
+import BotEditor from "@/pages/bot-editor";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/agent" component={AgentPage} />
       <Route path="/bots/:id/logs" component={BotLogs} />
+      <Route path="/bots/:id/editor" component={BotEditor} />
       <Route component={NotFound} />
     </Switch>
   );

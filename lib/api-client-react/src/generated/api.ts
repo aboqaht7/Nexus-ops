@@ -23,6 +23,10 @@ import type {
   AnthropicError,
   AnthropicMessage,
   Bot,
+  BotEnvPayload,
+  BotEnvVars,
+  BotFileContent,
+  BotFilePayload,
   BotLogs,
   BotsStats,
   ErrorResponse,
@@ -34,6 +38,7 @@ import type {
   ImportUrlBody,
   NewConversationBody,
   NewMessageBody,
+  SaveResult,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -930,6 +935,352 @@ export const useImportBotFromUrl = <
   TContext
 > => {
   return useMutation(getImportBotFromUrlMutationOptions(options));
+};
+
+/**
+ * @summary Get bot file content
+ */
+export const getGetBotFileUrl = (id: string) => {
+  return `/api/bots/${id}/file`;
+};
+
+export const getBotFile = async (
+  id: string,
+  options?: RequestInit,
+): Promise<BotFileContent> => {
+  return customFetch<BotFileContent>(getGetBotFileUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetBotFileQueryKey = (id: string) => {
+  return [`/api/bots/${id}/file`] as const;
+};
+
+export const getGetBotFileQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBotFile>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBotFile>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetBotFileQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getBotFile>>> = ({
+    signal,
+  }) => getBotFile(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBotFile>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetBotFileQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBotFile>>
+>;
+export type GetBotFileQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get bot file content
+ */
+
+export function useGetBotFile<
+  TData = Awaited<ReturnType<typeof getBotFile>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBotFile>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBotFileQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Save bot file content
+ */
+export const getSaveBotFileUrl = (id: string) => {
+  return `/api/bots/${id}/file`;
+};
+
+export const saveBotFile = async (
+  id: string,
+  botFilePayload: BotFilePayload,
+  options?: RequestInit,
+): Promise<SaveResult> => {
+  return customFetch<SaveResult>(getSaveBotFileUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(botFilePayload),
+  });
+};
+
+export const getSaveBotFileMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveBotFile>>,
+    TError,
+    { id: string; data: BodyType<BotFilePayload> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof saveBotFile>>,
+  TError,
+  { id: string; data: BodyType<BotFilePayload> },
+  TContext
+> => {
+  const mutationKey = ["saveBotFile"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof saveBotFile>>,
+    { id: string; data: BodyType<BotFilePayload> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return saveBotFile(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SaveBotFileMutationResult = NonNullable<
+  Awaited<ReturnType<typeof saveBotFile>>
+>;
+export type SaveBotFileMutationBody = BodyType<BotFilePayload>;
+export type SaveBotFileMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Save bot file content
+ */
+export const useSaveBotFile = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveBotFile>>,
+    TError,
+    { id: string; data: BodyType<BotFilePayload> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof saveBotFile>>,
+  TError,
+  { id: string; data: BodyType<BotFilePayload> },
+  TContext
+> => {
+  return useMutation(getSaveBotFileMutationOptions(options));
+};
+
+/**
+ * @summary Get bot environment variables
+ */
+export const getGetBotEnvUrl = (id: string) => {
+  return `/api/bots/${id}/env`;
+};
+
+export const getBotEnv = async (
+  id: string,
+  options?: RequestInit,
+): Promise<BotEnvVars> => {
+  return customFetch<BotEnvVars>(getGetBotEnvUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetBotEnvQueryKey = (id: string) => {
+  return [`/api/bots/${id}/env`] as const;
+};
+
+export const getGetBotEnvQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBotEnv>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBotEnv>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetBotEnvQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getBotEnv>>> = ({
+    signal,
+  }) => getBotEnv(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getBotEnv>>, TError, TData> & {
+    queryKey: QueryKey;
+  };
+};
+
+export type GetBotEnvQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBotEnv>>
+>;
+export type GetBotEnvQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get bot environment variables
+ */
+
+export function useGetBotEnv<
+  TData = Awaited<ReturnType<typeof getBotEnv>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBotEnv>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBotEnvQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Set bot environment variables
+ */
+export const getSetBotEnvUrl = (id: string) => {
+  return `/api/bots/${id}/env`;
+};
+
+export const setBotEnv = async (
+  id: string,
+  botEnvPayload: BotEnvPayload,
+  options?: RequestInit,
+): Promise<SaveResult> => {
+  return customFetch<SaveResult>(getSetBotEnvUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(botEnvPayload),
+  });
+};
+
+export const getSetBotEnvMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setBotEnv>>,
+    TError,
+    { id: string; data: BodyType<BotEnvPayload> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setBotEnv>>,
+  TError,
+  { id: string; data: BodyType<BotEnvPayload> },
+  TContext
+> => {
+  const mutationKey = ["setBotEnv"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setBotEnv>>,
+    { id: string; data: BodyType<BotEnvPayload> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return setBotEnv(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetBotEnvMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setBotEnv>>
+>;
+export type SetBotEnvMutationBody = BodyType<BotEnvPayload>;
+export type SetBotEnvMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Set bot environment variables
+ */
+export const useSetBotEnv = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setBotEnv>>,
+    TError,
+    { id: string; data: BodyType<BotEnvPayload> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setBotEnv>>,
+  TError,
+  { id: string; data: BodyType<BotEnvPayload> },
+  TContext
+> => {
+  return useMutation(getSetBotEnvMutationOptions(options));
 };
 
 /**

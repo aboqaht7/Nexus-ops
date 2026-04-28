@@ -26,8 +26,22 @@ Discord Bot Hosting panel — a full-stack monorepo for running Discord bots 24/
 
 - Bot files stored in `data/bot-files/`
 - Bot registry persisted in `data/bots.json`
+- Bot env vars stored in `data/bot-envs/{id}.json` (injected into process on start)
 - Supports JavaScript (node) and Python (python3) bots
 - Auto-restart on crash with exponential backoff (max 30s delay)
+- SSE log streaming via `subscribeToLogs()` pub/sub; 500-entry ring buffer
+
+## Replit-like IDE Features (per bot)
+
+- `/bots/:id/editor` — full-screen Monaco editor page
+  - Monaco code editor (left, syntax-highlighted JS/Python)
+  - Console tab: SSE real-time log stream via `GET /api/bots/:id/logs/stream`
+  - Secrets tab: add/edit/remove KEY=VALUE env vars with show/hide toggle
+  - Top bar: Run / Stop / Restart / Save buttons
+  - Ctrl+S to save; unsaved indicator (*) on Save button
+- `GET /api/bots/:id/file` + `PUT /api/bots/:id/file` — read/write bot source
+- `GET /api/bots/:id/env` + `PUT /api/bots/:id/env` — read/write env vars
+- Edit button (Code2 icon) added to every bot card
 - In-memory ring buffer for logs (200 entries per bot)
 - Bots with `autoRestart=true` resume automatically on server restart
 
