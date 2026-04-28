@@ -345,6 +345,7 @@ export default function AgentPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const autoStarted = useRef(false);
 
   const { data: convList = [] } = useListAnthropicConversations();
   const { data: activeConv } = useGetAnthropicConversation(activeConvId ?? 0, {
@@ -374,6 +375,30 @@ export default function AgentPage() {
     setActiveConvId(conv.id);
     qc.invalidateQueries({ queryKey: getListAnthropicConversationsQueryKey() });
   };
+
+  // Auto-start from template redirect
+  useEffect(() => {
+    if (autoStarted.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const botId = params.get("botId");
+    const botName = params.get("botName");
+    const prompt = params.get("prompt");
+    if (!botId && !prompt) return;
+    autoStarted.current = true;
+
+    const title = botName ? `تطوير: ${botName}` : "تخصيص قالب";
+    createConv.mutateAsync({ data: { title, botId: botId ?? null } }).then(conv => {
+      setActiveConvId(conv.id);
+      qc.invalidateQueries({ queryKey: getListAnthropicConversationsQueryKey() });
+      if (prompt) {
+        setInput(decodeURIComponent(prompt));
+        setTimeout(() => inputRef.current?.focus(), 300);
+      }
+      // Clean URL params without reload
+      window.history.replaceState({}, "", window.location.pathname);
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleDeleteConv = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
