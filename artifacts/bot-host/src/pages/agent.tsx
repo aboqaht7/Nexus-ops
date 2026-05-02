@@ -65,7 +65,14 @@ import {
   File as FileIcon,
   Key,
   History,
+  Search,
+  Save,
+  Coins,
+  Smartphone,
+  Tablet,
+  Monitor,
 } from "lucide-react";
+import Editor from "@monaco-editor/react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -137,6 +144,29 @@ function formatBytes(n?: number): string {
   if (n < 1024) return `${n}B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)}KB`;
   return `${(n / (1024 * 1024)).toFixed(1)}MB`;
+}
+
+function monacoLanguageFromPath(path: string): string {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  const map: Record<string, string> = {
+    ts: "typescript", tsx: "typescript",
+    js: "javascript", jsx: "javascript", mjs: "javascript", cjs: "javascript",
+    json: "json", jsonc: "json",
+    py: "python",
+    md: "markdown", markdown: "markdown",
+    html: "html", htm: "html",
+    css: "css", scss: "scss", less: "less",
+    yml: "yaml", yaml: "yaml",
+    toml: "ini", ini: "ini",
+    sh: "shell", bash: "shell",
+    sql: "sql",
+    go: "go", rs: "rust", java: "java", rb: "ruby", php: "php",
+    c: "c", h: "c", cpp: "cpp", hpp: "cpp",
+    xml: "xml", svg: "xml",
+    env: "ini",
+    dockerfile: "dockerfile",
+  };
+  return map[ext] ?? "plaintext";
 }
 
 function FileTreeNode({
@@ -670,8 +700,10 @@ export default function AgentPage() {
   const [streaming, setStreaming] = useState(false);
   const [streamingEvents, setStreamingEvents] = useState<StreamEvent[]>([]);
 
-  /* ── Right panel: files + logs + secrets + checkpoints ─────────────── */
-  const [rightTab, setRightTab] = useState<"files" | "logs" | "secrets" | "checkpoints">("files");
+  /* ── Right panel: files + logs + secrets + checkpoints + preview ───── */
+  const [rightTab, setRightTab] = useState<"files" | "logs" | "secrets" | "checkpoints" | "preview">("files");
+  const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [previewKey, setPreviewKey] = useState(0);
   const [fileTree, setFileTree] = useState<TreeNode[]>([]);
   const [treeLoading, setTreeLoading] = useState(false);
   const [openDirs, setOpenDirs] = useState<Set<string>>(new Set([""]));
@@ -689,6 +721,21 @@ export default function AgentPage() {
   const [checkpoints, setCheckpoints] = useState<Array<{ sha: string; shortSha: string; subject: string; createdAt: string; isAutomatic: boolean }>>([]);
   const [checkpointsLoading, setCheckpointsLoading] = useState(false);
   const [restoringSha, setRestoringSha] = useState<string | null>(null);
+
+  /* ── Editable file state ────────────────────────────────────────────── */
+  const [editorContent, setEditorContent] = useState<string>("");
+  const [editorDirty, setEditorDirty] = useState(false);
+  const [savingFile, setSavingFile] = useState(false);
+
+  /* ── Global search ──────────────────────────────────────────────────── */
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Array<{ path: string; line: number; snippet: string; matchStart: number; matchEnd: number }>>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchScanned, setSearchScanned] = useState(0);
+
+  /* ── Cost / usage ───────────────────────────────────────────────────── */
+  const [usage, setUsage] = useState<{ inputTokens: number; outputTokens: number; costSar: number; costUsd: number } | null>(null);
   const logScrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -736,22 +783,27 @@ export default function AgentPage() {
     }
   }, []);
 
+  // Token-based race guard: if a newer fetch is in flight, ignore older responses
+  const fileFetchTokenRef = useRef(0);
   const fetchFileContent = useCallback(async (botId: string, path: string) => {
+    const myToken = ++fileFetchTokenRef.current;
     setContentLoading(true);
     setContentError(null);
     setFileContent("");
     try {
       const r = await fetch(`${apiBase()}/api/bots/${botId}/files/content?path=${encodeURIComponent(path)}`);
       const json = await r.json() as { content?: string; error?: string };
+      if (myToken !== fileFetchTokenRef.current) return; // stale response, drop it
       if (!r.ok) {
         setContentError(json.error ?? `error ${r.status}`);
       } else {
         setFileContent(json.content ?? "");
       }
     } catch (e) {
+      if (myToken !== fileFetchTokenRef.current) return;
       setContentError((e as Error).message);
     } finally {
-      setContentLoading(false);
+      if (myToken === fileFetchTokenRef.current) setContentLoading(false);
     }
   }, []);
 
@@ -833,6 +885,72 @@ export default function AgentPage() {
     } catch { /* ignore */ }
   }, [linkedBotId, fetchCheckpoints]);
 
+  const fetchUsage = useCallback(async (convId: number) => {
+    try {
+      const r = await fetch(`${apiBase()}/api/anthropic/conversations/${convId}/usage`);
+      if (!r.ok) return;
+      const j = await r.json() as { inputTokens: number; outputTokens: number; costSar: number; costUsd: number };
+      setUsage({ inputTokens: j.inputTokens, outputTokens: j.outputTokens, costSar: j.costSar, costUsd: j.costUsd });
+    } catch { /* ignore */ }
+  }, []);
+
+  const handleSaveFile = useCallback(async () => {
+    if (!linkedBotId || !selectedFile || !editorDirty) return;
+    setSavingFile(true);
+    try {
+      const r = await fetch(`${apiBase()}/api/bots/${linkedBotId}/files/content`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: selectedFile.path, content: editorContent }),
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({})) as { error?: string };
+        throw new Error(j.error ?? `error ${r.status}`);
+      }
+      setEditorDirty(false);
+      setFileContent(editorContent);
+      toast({ title: "تم الحفظ", description: selectedFile.path });
+      void fetchTree(linkedBotId);
+    } catch (e) {
+      toast({ title: "فشل الحفظ", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setSavingFile(false);
+    }
+  }, [linkedBotId, selectedFile, editorDirty, editorContent, toast, fetchTree]);
+
+  const handleSearch = useCallback(async (q: string) => {
+    if (!linkedBotId || q.length < 2) { setSearchResults([]); return; }
+    setSearchLoading(true);
+    try {
+      const r = await fetch(`${apiBase()}/api/bots/${linkedBotId}/search?q=${encodeURIComponent(q)}`);
+      if (!r.ok) { setSearchResults([]); return; }
+      const j = await r.json() as { hits?: Array<{ path: string; line: number; snippet: string; matchStart: number; matchEnd: number }>; filesScanned?: number };
+      setSearchResults(j.hits ?? []);
+      setSearchScanned(j.filesScanned ?? 0);
+    } catch { setSearchResults([]); }
+    finally { setSearchLoading(false); }
+  }, [linkedBotId]);
+
+  const handleSearchResultClick = useCallback((path: string) => {
+    if (!linkedBotId) return;
+    setSearchOpen(false);
+    setRightTab("files");
+    void fetchFileContent(linkedBotId, path);
+    const parts = path.split("/");
+    const name = parts[parts.length - 1] ?? path;
+    setSelectedFile({ name, path, type: "file", size: 0 });
+    // open all parent dirs
+    setOpenDirs(prev => {
+      const next = new Set(prev);
+      let acc = "";
+      for (let i = 0; i < parts.length - 1; i++) {
+        acc = acc ? `${acc}/${parts[i]}` : parts[i] as string;
+        next.add(acc);
+      }
+      return next;
+    });
+  }, [linkedBotId, fetchFileContent]);
+
   const handleRestoreCheckpoint = useCallback(async (sha: string) => {
     if (!linkedBotId) return;
     if (!window.confirm("استعادة هذه النقطة؟ (سيتم حفظ نسخة احتياطية من الحالة الحالية تلقائياً)")) return;
@@ -873,6 +991,56 @@ export default function AgentPage() {
     if (rightTab === "secrets") void fetchSecrets(linkedBotId);
     if (rightTab === "checkpoints") void fetchCheckpoints(linkedBotId);
   }, [rightTab, linkedBotId, fetchSecrets, fetchCheckpoints]);
+
+  // Sync editor when the user switches files (always reset on path change).
+  // When fileContent updates while user is editing the SAME file, preserve their edits.
+  const lastSyncedPathRef = useRef<string | null>(null);
+  useEffect(() => {
+    const path = selectedFile?.path ?? null;
+    if (path !== lastSyncedPathRef.current) {
+      // File changed → adopt fresh content & reset dirty flag
+      setEditorContent(fileContent);
+      setEditorDirty(false);
+      lastSyncedPathRef.current = path;
+    } else if (!editorDirty) {
+      // Same file, no unsaved edits → safe to absorb refreshed content
+      setEditorContent(fileContent);
+    }
+    // If same file AND dirty → keep user edits intact (do nothing)
+  }, [fileContent, selectedFile?.path, editorDirty]);
+
+  // Fetch usage on conversation change
+  useEffect(() => {
+    if (activeConvId) {
+      void fetchUsage(activeConvId);
+    } else {
+      setUsage(null);
+    }
+  }, [activeConvId, fetchUsage]);
+
+  // Ctrl+S / Cmd+S to save current file (only when Files tab + file selected + dirty).
+  // Ctrl/Cmd+Shift+F → open global search (only when a bot is linked).
+  // Both guards check the active element so we never hijack typing in other inputs.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (document.activeElement as HTMLElement | null)?.tagName ?? "";
+      const isTypingInForm = tag === "TEXTAREA" || (tag === "INPUT" && (document.activeElement as HTMLInputElement).type !== "button");
+      // Save: only intercept if the editor tab is open with unsaved changes
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "s") {
+        if (rightTab === "files" && selectedFile && editorDirty) {
+          e.preventDefault();
+          void handleSaveFile();
+        }
+      }
+      // Search: don't intercept while user is typing a Shift+F in a form field by accident
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "f" && linkedBotId && !isTypingInForm) {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [rightTab, selectedFile, editorDirty, handleSaveFile, linkedBotId]);
 
   // Refresh tree + checkpoints after streaming ends + track touched files for highlight
   const wasStreamingRef = useRef(false);
@@ -1054,6 +1222,13 @@ export default function AgentPage() {
             setStreamingEvents(prev => [...prev, { type: "tool_running", id: json.id as string, name: json.name as string, input: (json.input ?? {}) as Record<string, unknown> }]);
           } else if (json.type === "tool_result") {
             setStreamingEvents(prev => [...prev, { type: "tool_result", id: json.id as string, name: json.name as string, output: json.output as string }]);
+          } else if (json.type === "usage") {
+            setUsage(prev => ({
+              inputTokens: (prev?.inputTokens ?? 0) + (json["inputTokens"] as number ?? 0),
+              outputTokens: (prev?.outputTokens ?? 0) + (json["outputTokens"] as number ?? 0),
+              costSar: (prev?.costSar ?? 0) + (json["costSar"] as number ?? 0),
+              costUsd: (prev?.costUsd ?? 0) + (json["costUsd"] as number ?? 0),
+            }));
           } else if (json.type === "done") {
             qc.invalidateQueries({ queryKey: getGetAnthropicConversationQueryKey(activeConvId) });
             setStreamingEvents([]);
@@ -1272,6 +1447,21 @@ export default function AgentPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {usage && (usage.inputTokens > 0 || usage.outputTokens > 0) && (
+                    <div
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 text-[10px] font-mono"
+                      title={`Input: ${usage.inputTokens.toLocaleString("en-US")} tokens · Output: ${usage.outputTokens.toLocaleString("en-US")} tokens · ≈ $${usage.costUsd.toFixed(4)}`}
+                      dir="ltr"
+                    >
+                      <Coins className="w-3 h-3 text-amber-600" />
+                      <span className="text-amber-700 dark:text-amber-400 font-semibold">
+                        {usage.costSar < 0.01 ? "<0.01" : usage.costSar.toFixed(2)} SAR
+                      </span>
+                      <span className="text-muted-foreground/60">
+                        ({((usage.inputTokens + usage.outputTokens) / 1000).toFixed(1)}K tok)
+                      </span>
+                    </div>
+                  )}
                   {linkedBot && ["website", "game", "web-app"].includes(((linkedBot as unknown) as { projectType?: string }).projectType ?? "") && (
                     <Button
                       size="sm"
@@ -1472,6 +1662,21 @@ export default function AgentPage() {
                 <History className="w-3.5 h-3.5" />
                 الحفظ
               </button>
+              {linkedBotForPanel && ["website", "game", "web-app"].includes(((linkedBotForPanel as unknown) as { projectType?: string }).projectType ?? "") && (
+                <button
+                  type="button"
+                  onClick={() => setRightTab("preview")}
+                  className={cn(
+                    "flex-1 px-2 py-2.5 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors",
+                    rightTab === "preview"
+                      ? "bg-background text-foreground border-b-2 border-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Monitor className="w-3.5 h-3.5" />
+                  معاينة
+                </button>
+              )}
             </div>
 
             {rightTab === "files" && (
@@ -1480,15 +1685,25 @@ export default function AgentPage() {
                   <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                     شجرة المشروع
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => linkedBotId && void fetchTree(linkedBotId)}
-                    disabled={treeLoading}
-                    className="text-muted-foreground hover:text-foreground p-0.5 rounded"
-                    title="تحديث"
-                  >
-                    <RefreshCw className={cn("w-3 h-3", treeLoading && "animate-spin")} />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setSearchOpen(true)}
+                      className="text-muted-foreground hover:text-foreground p-0.5 rounded"
+                      title="بحث (Ctrl+Shift+F)"
+                    >
+                      <Search className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => linkedBotId && void fetchTree(linkedBotId)}
+                      disabled={treeLoading}
+                      className="text-muted-foreground hover:text-foreground p-0.5 rounded"
+                      title="تحديث"
+                    >
+                      <RefreshCw className={cn("w-3 h-3", treeLoading && "animate-spin")} />
+                    </button>
+                  </div>
                 </div>
                 <ScrollArea className="flex-1 max-h-[40%]">
                   <div className="py-1">
@@ -1516,14 +1731,29 @@ export default function AgentPage() {
                   {selectedFile ? (
                     <>
                       <div className="px-3 py-1.5 border-b border-border/30 flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-mono truncate text-foreground/80" dir="ltr">
+                        <span className="text-[11px] font-mono truncate text-foreground/80 flex items-center gap-1" dir="ltr">
+                          {editorDirty && <span className="w-1.5 h-1.5 rounded-full bg-orange-500" title="تغييرات غير محفوظة" />}
                           {selectedFile.path}
                         </span>
-                        <span className="text-[9px] text-muted-foreground/60 ltr-text flex-shrink-0">
-                          {formatBytes(selectedFile.size)}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <span className="text-[9px] text-muted-foreground/60 ltr-text">
+                            {formatBytes(selectedFile.size)}
+                          </span>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={editorDirty ? "default" : "outline"}
+                            disabled={!editorDirty || savingFile}
+                            onClick={() => void handleSaveFile()}
+                            className="h-6 text-[10px] px-2 gap-1"
+                            title="Ctrl+S"
+                          >
+                            <Save className="w-3 h-3" />
+                            {savingFile ? "..." : "حفظ"}
+                          </Button>
+                        </div>
                       </div>
-                      <ScrollArea className="flex-1">
+                      <div className="flex-1 min-h-0">
                         {contentLoading && (
                           <p className="px-3 py-4 text-xs text-muted-foreground">جاري التحميل...</p>
                         )}
@@ -1531,11 +1761,28 @@ export default function AgentPage() {
                           <p className="px-3 py-4 text-xs text-destructive" dir="ltr">{contentError}</p>
                         )}
                         {!contentLoading && !contentError && (
-                          <pre className="text-[10px] leading-snug font-mono p-3 whitespace-pre-wrap break-words text-foreground/85" dir="ltr">
-                            {fileContent || "(empty file)"}
-                          </pre>
+                          <Editor
+                            height="100%"
+                            language={monacoLanguageFromPath(selectedFile.path)}
+                            value={editorContent}
+                            theme="vs-dark"
+                            onChange={(v) => {
+                              const next = v ?? "";
+                              setEditorContent(next);
+                              setEditorDirty(next !== fileContent);
+                            }}
+                            options={{
+                              minimap: { enabled: false },
+                              fontSize: 12,
+                              lineNumbers: "on",
+                              wordWrap: "on",
+                              scrollBeyondLastLine: false,
+                              tabSize: 2,
+                              automaticLayout: true,
+                            }}
+                          />
                         )}
-                      </ScrollArea>
+                      </div>
                     </>
                   ) : (
                     <div className="flex-1 flex items-center justify-center px-4 text-center">
@@ -1753,6 +2000,98 @@ export default function AgentPage() {
                 </div>
               </div>
             )}
+
+            {rightTab === "preview" && linkedBotForPanel && (
+              <div className="flex-1 flex flex-col min-h-0 bg-muted/20">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-border/30 bg-background/40">
+                  <div className="flex items-center gap-1 bg-muted/40 rounded-md p-0.5">
+                    {([
+                      { key: "desktop", icon: Monitor, label: "سطح المكتب", w: 1280 },
+                      { key: "tablet",  icon: Tablet,  label: "لوحي", w: 768 },
+                      { key: "mobile",  icon: Smartphone, label: "جوال", w: 390 },
+                    ] as const).map(({ key, icon: Icon, label, w }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setPreviewDevice(key)}
+                        className={cn(
+                          "flex items-center gap-1 px-2 py-1 rounded text-[10px] transition-colors",
+                          previewDevice === key
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                        title={`${label} · ${w}px`}
+                      >
+                        <Icon className="w-3 h-3" />
+                        <span>{w}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewKey(k => k + 1)}
+                      className="text-muted-foreground hover:text-foreground p-0.5 rounded"
+                      title="إعادة تحميل"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+                        window.open(`${BASE}/api/preview/${linkedBotForPanel.id}`, "_blank", "noopener,noreferrer");
+                      }}
+                      className="text-muted-foreground hover:text-foreground p-0.5 rounded"
+                      title="فتح في نافذة جديدة"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex-1 min-h-0 overflow-auto flex items-start justify-center p-3">
+                  {(() => {
+                    const widths = { desktop: 1280, tablet: 768, mobile: 390 } as const;
+                    const heights = { desktop: 800, tablet: 1024, mobile: 844 } as const;
+                    const w = widths[previewDevice];
+                    const h = heights[previewDevice];
+                    const isDevice = previewDevice !== "desktop";
+                    const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+                    return (
+                      <div
+                        className={cn(
+                          "bg-white rounded-md shadow-lg overflow-hidden flex-shrink-0 origin-top",
+                          isDevice && "ring-2 ring-foreground/20 ring-offset-2 ring-offset-muted/20"
+                        )}
+                        style={{
+                          width: w,
+                          height: h,
+                          transform: "scale(var(--preview-scale, 1))",
+                          transformOrigin: "top center",
+                        }}
+                        ref={(el) => {
+                          if (!el) return;
+                          const parent = el.parentElement;
+                          if (!parent) return;
+                          const avail = parent.clientWidth - 24;
+                          const scale = avail < w ? Math.max(0.2, avail / w) : 1;
+                          el.style.setProperty("--preview-scale", String(scale));
+                          el.style.marginBottom = `${h * (scale - 1)}px`;
+                        }}
+                      >
+                        <iframe
+                          key={previewKey}
+                          src={`${BASE}/api/preview/${linkedBotForPanel.id}`}
+                          className="w-full h-full border-0"
+                          title={`Preview of ${linkedBotForPanel.name}`}
+                          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                        />
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1772,6 +2111,84 @@ export default function AgentPage() {
         onDeploy={handleDeploy}
         loading={deployBot.isPending}
       />
+
+      {/* Global file search dialog */}
+      {searchOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-start justify-center pt-24 px-4"
+          onClick={() => setSearchOpen(false)}
+        >
+          <div
+            className="w-full max-w-2xl bg-background border border-border rounded-lg shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+              <Search className="w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                autoFocus
+                value={searchQuery}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setSearchQuery(v);
+                  void handleSearch(v);
+                }}
+                onKeyDown={(e) => { if (e.key === "Escape") setSearchOpen(false); }}
+                placeholder="ابحث في كل ملفات المشروع... (حرفان على الأقل)"
+                className="flex-1 bg-transparent border-0 outline-none text-sm placeholder:text-muted-foreground/60"
+                dir="auto"
+              />
+              {searchLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+              <kbd className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/50">ESC</kbd>
+            </div>
+            <ScrollArea className="max-h-[60vh]">
+              {searchQuery.length < 2 && (
+                <p className="px-4 py-8 text-xs text-center text-muted-foreground/60">
+                  اكتب كلمة للبحث في جميع ملفات البوت (يتم تجاهل node_modules و .git)
+                </p>
+              )}
+              {searchQuery.length >= 2 && !searchLoading && searchResults.length === 0 && (
+                <p className="px-4 py-8 text-xs text-center text-muted-foreground/60">
+                  لا توجد نتائج · فُحص {searchScanned} ملف
+                </p>
+              )}
+              {searchResults.length > 0 && (
+                <>
+                  <p className="px-4 py-1.5 text-[10px] text-muted-foreground/60 border-b border-border/30 bg-muted/20">
+                    {searchResults.length} نتيجة في {searchScanned} ملف
+                  </p>
+                  <div className="divide-y divide-border/30">
+                    {searchResults.map((hit, i) => (
+                      <button
+                        key={`${hit.path}-${hit.line}-${i}`}
+                        type="button"
+                        onClick={() => handleSearchResultClick(hit.path)}
+                        className="w-full text-right px-4 py-2 hover:bg-primary/5 transition-colors block"
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-0.5">
+                          <span className="text-[11px] font-mono text-primary truncate" dir="ltr">
+                            {hit.path}
+                          </span>
+                          <span className="text-[9px] text-muted-foreground/60 ltr-text flex-shrink-0">
+                            line {hit.line}
+                          </span>
+                        </div>
+                        <pre className="text-[10px] font-mono text-foreground/70 whitespace-pre overflow-hidden text-ellipsis" dir="ltr">
+                          {hit.snippet.slice(0, hit.matchStart)}
+                          <span className="bg-amber-500/30 text-amber-900 dark:text-amber-200 rounded px-0.5">
+                            {hit.snippet.slice(hit.matchStart, hit.matchEnd)}
+                          </span>
+                          {hit.snippet.slice(hit.matchEnd)}
+                        </pre>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </ScrollArea>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }

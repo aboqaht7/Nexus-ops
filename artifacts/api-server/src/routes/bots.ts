@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request } from "express";
 import multer from "multer";
 import { join, extname, basename, resolve, sep, relative } from "path";
-import { readFileSync, unlinkSync, existsSync, readdirSync, statSync, lstatSync } from "fs";
+import { readFileSync, writeFileSync, unlinkSync, existsSync, readdirSync, statSync, lstatSync } from "fs";
 import { getAuth } from "@clerk/express";
 import {
   listBots,
@@ -1240,6 +1240,142 @@ router.get("/bots/:id/files/tree", (req, res): void => {
   res.json({ id, count: counter.n, tree });
 });
 
+router.put("/bots/:id/files/content", (req, res): void => {
+  const id = req.params["id"];
+  if (typeof id !== "string" || !id) { res.status(400).json({ error: "id is required" }); return; }
+  const bot = getBot(id);
+  if (!bot) { res.status(404).json({ error: "Bot not found" }); return; }
+  if (!isAuthorized(bot, getUserId(req))) { res.status(403).json({ error: "Forbidden" }); return; }
+  const body = req.body as { path?: unknown; content?: unknown } | undefined;
+  const rawPath = body?.path;
+  const content = body?.content;
+  if (typeof rawPath !== "string" || !rawPath.trim()) { res.status(400).json({ error: "path is required" }); return; }
+  if (typeof content !== "string") { res.status(400).json({ error: "content must be string" }); return; }
+  if (Buffer.byteLength(content, "utf-8") > FILE_CONTENT_MAX_BYTES) {
+    res.status(413).json({ error: `content too large (max ${FILE_CONTENT_MAX_BYTES} bytes)` });
+    return;
+  }
+  const root = resolve(getBotDir(id));
+  const rootSep = root.endsWith(sep) ? root : root + sep;
+  const trimmed = rawPath.trim().replace(/^\/+/, "");
+  if (trimmed.includes("\0") || trimmed.includes("..")) { res.status(400).json({ error: "invalid path" }); return; }
+  const abs = resolve(join(root, trimmed));
+  if (abs !== root && !abs.startsWith(rootSep)) { res.status(400).json({ error: "path escapes project" }); return; }
+  if (!existsSync(abs)) { res.status(404).json({ error: "file not found (cannot create new files via this endpoint)" }); return; }
+  const ls = lstatSync(abs);
+  if (ls.isSymbolicLink()) { res.status(400).json({ error: "symlinks are not editable" }); return; }
+  const s = statSync(abs);
+  if (s.isDirectory()) { res.status(400).json({ error: "path is a directory" }); return; }
+  try {
+    writeFileSync(abs, content, "utf-8");
+    const newSize = Buffer.byteLength(content, "utf-8");
+    res.json({ id, path: trimmed, size: newSize, saved: true });
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message });
+  }
+});
+
+const SEARCH_MAX_FILES = 2000;
+const SEARCH_MAX_FILE_BYTES = 256 * 1024;
+const SEARCH_MAX_RESULTS = 200;
+const SEARCH_SKIP_DIRS = new Set(["node_modules", ".git", "site-packages", "__pycache__", ".venv", "venv", "dist", "build", ".next", ".cache"]);
+
+interface SearchHit {
+  path: string;
+  line: number;
+  snippet: string;
+  matchStart: number;
+  matchEnd: number;
+}
+
+async function searchInDir(
+  root: string,
+  dir: string,
+  needle: string,
+  hits: SearchHit[],
+  caseSensitive: boolean,
+  counters: { files: number },
+): Promise<void> {
+  if (hits.length >= SEARCH_MAX_RESULTS) return;
+  if (counters.files >= SEARCH_MAX_FILES) return;
+  let entries: string[];
+  try { entries = readdirSync(dir); } catch { return; }
+  for (const name of entries) {
+    if (hits.length >= SEARCH_MAX_RESULTS) return;
+    if (counters.files >= SEARCH_MAX_FILES) return;
+    if (SEARCH_SKIP_DIRS.has(name)) continue;
+    const abs = join(dir, name);
+    // Reject symlinks to prevent traversal outside the project root
+    let lsEntry;
+    try { lsEntry = lstatSync(abs); } catch { continue; }
+    if (lsEntry.isSymbolicLink()) continue;
+    let st;
+    try { st = statSync(abs); } catch { continue; }
+    if (st.isDirectory()) {
+      await searchInDir(root, abs, needle, hits, caseSensitive, counters);
+    } else if (st.isFile()) {
+      if (st.size > SEARCH_MAX_FILE_BYTES) continue;
+      const ext = extname(abs).toLowerCase();
+      if (!TEXT_EXTS.has(ext) && st.size > 64 * 1024) continue;
+      counters.files++;
+      // Yield to event loop every 25 files to avoid blocking other requests
+      if (counters.files % 25 === 0) {
+        await new Promise<void>((resolve) => { setImmediate(resolve); });
+      }
+      let txt: string;
+      try { txt = readFileSync(abs, "utf-8"); } catch { continue; }
+      const haystack = caseSensitive ? txt : txt.toLowerCase();
+      const target = caseSensitive ? needle : needle.toLowerCase();
+      let off = 0;
+      while (off < haystack.length) {
+        const idx = haystack.indexOf(target, off);
+        if (idx === -1) break;
+        // find line number + boundaries
+        let lineStart = idx;
+        while (lineStart > 0 && txt[lineStart - 1] !== "\n") lineStart--;
+        let lineEnd = idx + target.length;
+        while (lineEnd < txt.length && txt[lineEnd] !== "\n") lineEnd++;
+        const line = txt.slice(0, idx).split("\n").length;
+        const snippet = txt.slice(lineStart, lineEnd).slice(0, 240);
+        hits.push({
+          path: relative(root, abs).replace(/\\/g, "/"),
+          line,
+          snippet,
+          matchStart: idx - lineStart,
+          matchEnd: idx - lineStart + target.length,
+        });
+        if (hits.length >= SEARCH_MAX_RESULTS) return;
+        off = idx + target.length;
+      }
+    }
+  }
+}
+
+router.get("/bots/:id/search", async (req, res): Promise<void> => {
+  const id = req.params["id"];
+  if (typeof id !== "string" || !id) { res.status(400).json({ error: "id is required" }); return; }
+  const bot = getBot(id);
+  if (!bot) { res.status(404).json({ error: "Bot not found" }); return; }
+  if (!isAuthorized(bot, getUserId(req))) { res.status(403).json({ error: "Forbidden" }); return; }
+  const q = req.query["q"];
+  if (typeof q !== "string" || q.length < 2) { res.status(400).json({ error: "q must be at least 2 chars" }); return; }
+  if (q.length > 200) { res.status(400).json({ error: "q too long" }); return; }
+  const caseSensitive = req.query["cs"] === "1" || req.query["cs"] === "true";
+  const root = resolve(getBotDir(id));
+  if (!existsSync(root)) { res.json({ id, query: q, count: 0, hits: [] }); return; }
+  const hits: SearchHit[] = [];
+  const counters = { files: 0 };
+  await searchInDir(root, root, q, hits, caseSensitive, counters);
+  res.json({
+    id,
+    query: q,
+    count: hits.length,
+    truncated: hits.length >= SEARCH_MAX_RESULTS,
+    filesScanned: counters.files,
+    hits,
+  });
+});
+
 router.get("/bots/:id/files/content", (req, res): void => {
   const id = req.params["id"];
   const rawPath = req.query["path"];
@@ -1264,6 +1400,8 @@ router.get("/bots/:id/files/content", (req, res): void => {
     return;
   }
   if (!existsSync(abs)) { res.status(404).json({ error: "file not found" }); return; }
+  const ls2 = lstatSync(abs);
+  if (ls2.isSymbolicLink()) { res.status(400).json({ error: "symlinks are not readable" }); return; }
   const s = statSync(abs);
   if (s.isDirectory()) { res.status(400).json({ error: "path is a directory" }); return; }
   if (s.size > FILE_CONTENT_MAX_BYTES) {

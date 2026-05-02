@@ -13,6 +13,16 @@ import { getBotDir } from "../../lib/bot-manager.js";
 import { logger } from "../../lib/logger.js";
 import type Anthropic from "@anthropic-ai/sdk";
 
+// Anthropic Sonnet pricing (USD per 1M tokens). Override via env if needed.
+const COST_INPUT_PER_M_USD = Number(process.env["ANTHROPIC_INPUT_USD_PER_M"] ?? "3");
+const COST_OUTPUT_PER_M_USD = Number(process.env["ANTHROPIC_OUTPUT_USD_PER_M"] ?? "15");
+const USD_TO_SAR = Number(process.env["USD_TO_SAR"] ?? "3.75");
+
+export function estimateCost(inputTokens: number, outputTokens: number): { costUsd: number; costSar: number } {
+  const usd = (inputTokens / 1_000_000) * COST_INPUT_PER_M_USD + (outputTokens / 1_000_000) * COST_OUTPUT_PER_M_USD;
+  return { costUsd: Math.round(usd * 10000) / 10000, costSar: Math.round(usd * USD_TO_SAR * 10000) / 10000 };
+}
+
 const FILE_MUTATING_TOOLS = new Set([
   "write_bot_file",
   "write_file",
@@ -202,6 +212,37 @@ router.get("/anthropic/conversations/:id/messages", async (req, res) => {
   res.json(msgs);
 });
 
+router.get("/anthropic/conversations/:id/usage", async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const rows = await db
+    .select({ inputTokens: messages.inputTokens, outputTokens: messages.outputTokens })
+    .from(messages)
+    .where(eq(messages.conversationId, id));
+
+  let inputTokens = 0;
+  let outputTokens = 0;
+  for (const r of rows) {
+    inputTokens += r.inputTokens ?? 0;
+    outputTokens += r.outputTokens ?? 0;
+  }
+  const cost = estimateCost(inputTokens, outputTokens);
+  res.json({
+    conversationId: id,
+    messageCount: rows.length,
+    inputTokens,
+    outputTokens,
+    totalTokens: inputTokens + outputTokens,
+    ...cost,
+    pricing: {
+      inputUsdPer1M: COST_INPUT_PER_M_USD,
+      outputUsdPer1M: COST_OUTPUT_PER_M_USD,
+      usdToSar: USD_TO_SAR,
+    },
+  });
+});
+
 /* ── SSE helper ─────────────────────────────────────────────────────────── */
 
 function sseWrite(res: import("express").Response, data: object) {
@@ -261,6 +302,8 @@ router.post("/anthropic/conversations/:id/messages", async (req, res) => {
   });
 
   let fullAssistantText = "";
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
   const toolSummaries: string[] = [];
   let touchedFiles = false;
 
@@ -300,6 +343,10 @@ router.post("/anthropic/conversations/:id/messages", async (req, res) => {
       }
 
       const finalMsg = await stream.finalMessage();
+      if (finalMsg.usage) {
+        totalInputTokens += finalMsg.usage.input_tokens ?? 0;
+        totalOutputTokens += finalMsg.usage.output_tokens ?? 0;
+      }
 
       if (finalMsg.stop_reason !== "tool_use" || toolUseBlocks.length === 0) break;
 
@@ -350,11 +397,24 @@ router.post("/anthropic/conversations/:id/messages", async (req, res) => {
       }
     }
 
-    // Persist final assistant message
+    // Persist final assistant message + token usage
     const savedContent = fullAssistantText.trim()
       || (toolSummaries.length > 0 ? `نفّذت ${toolSummaries.length} عملية تلقائياً:\n${toolSummaries.join("\n")}` : "(no response)");
 
-    await db.insert(messages).values({ conversationId: id, role: "assistant", content: savedContent });
+    await db.insert(messages).values({
+      conversationId: id,
+      role: "assistant",
+      content: savedContent,
+      inputTokens: totalInputTokens,
+      outputTokens: totalOutputTokens,
+    });
+
+    sseWrite(res, {
+      type: "usage",
+      inputTokens: totalInputTokens,
+      outputTokens: totalOutputTokens,
+      ...estimateCost(totalInputTokens, totalOutputTokens),
+    });
 
     sseWrite(res, { type: "done" });
     res.end();
