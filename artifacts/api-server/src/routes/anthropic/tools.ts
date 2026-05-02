@@ -2,6 +2,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { readdirSync, readFileSync, writeFileSync, existsSync, statSync, mkdirSync, rmSync } from "fs";
 import { join, resolve, sep, dirname, relative } from "path";
+import { request as httpsRequest } from "https";
 import {
   getBotFileContent,
   setBotFileContent,
@@ -181,6 +182,20 @@ export const AGENT_TOOLS = [
         },
       },
       required: ["path", "content"],
+    },
+  },
+  {
+    name: "web_search",
+    description: "Search the public web for documentation, code examples, library APIs, error messages, or best practices. Returns up to 5 results (title + URL + snippet). Use this BEFORE writing code that involves a library or API you're not 100% sure about.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: {
+          type: "string",
+          description: "Concise search query, e.g. 'three.js OrbitControls touch events' or 'react-router v6 redirect'",
+        },
+      },
+      required: ["query"],
     },
   },
   {
@@ -365,6 +380,18 @@ export async function executeTool(
       }
     }
 
+    case "web_search": {
+      const q = input["query"];
+      if (typeof q !== "string" || !q.trim()) return "Error: query is required";
+      try {
+        const results = await webSearch(q.trim());
+        if (results.length === 0) return "(no results)";
+        return results.map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.snippet}`).join("\n\n");
+      } catch (e) {
+        return `Error: web search failed: ${(e as Error).message}`;
+      }
+    }
+
     case "delete_file": {
       const p = input["path"];
       if (typeof p !== "string" || !p.trim()) return "Error: path is required";
@@ -383,6 +410,114 @@ export async function executeTool(
     default:
       return "Unknown tool.";
   }
+}
+
+/* ── Web search (DuckDuckGo HTML, no API key) ──────────────────────────── */
+
+interface SearchResult { title: string; url: string; snippet: string }
+
+function decodeHtml(s: string): string {
+  return s
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
+    .replace(/&#x27;/g, "'").replace(/&#x2F;/g, "/");
+}
+function stripTags(s: string): string {
+  return decodeHtml(s.replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim();
+}
+
+const FETCH_MAX_BYTES = 2 * 1024 * 1024; // cap web-search HTML response at 2MB to avoid OOM
+
+async function fetchHtml(url: string): Promise<string> {
+  return new Promise((res, rej) => {
+    const u = new URL(url);
+    const req = httpsRequest(
+      {
+        hostname: u.hostname,
+        path: u.pathname + u.search,
+        method: "GET",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; NexusOpsAgent/1.0)",
+          "Accept": "text/html,application/xhtml+xml",
+          "Accept-Language": "en-US,en;q=0.5",
+        },
+        timeout: 8000,
+      },
+      (r) => {
+        let total = 0;
+        const chunks: Buffer[] = [];
+        r.on("data", (c: Buffer) => {
+          total += c.length;
+          if (total > FETCH_MAX_BYTES) {
+            r.destroy(new Error("response too large"));
+            return;
+          }
+          chunks.push(c);
+        });
+        r.on("end", () => res(Buffer.concat(chunks).toString("utf-8")));
+        r.on("error", rej);
+      },
+    );
+    req.on("error", rej);
+    req.on("timeout", () => { req.destroy(new Error("timeout")); });
+    req.end();
+  });
+}
+
+// Reject URLs that resolve to private / local / metadata addresses.
+// We can't do real DNS resolution synchronously, so we reject obvious literals + RFC1918 / link-local hostnames.
+function isUnsafeHost(host: string): boolean {
+  const h = host.toLowerCase().split(":")[0] ?? "";
+  if (!h) return true;
+  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") || h.endsWith(".internal")) return true;
+  // IPv4 literal checks
+  const v4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) {
+    const a = Number(v4[1]), b = Number(v4[2]);
+    if (a === 10) return true;
+    if (a === 127) return true;
+    if (a === 0) return true;
+    if (a === 169 && b === 254) return true; // link-local incl. AWS metadata 169.254.169.254
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a >= 224) return true; // multicast / reserved
+  }
+  // IPv6 literal: bracketed in URL host, but raw could appear
+  if (h === "::1" || h === "::" || h.startsWith("fc") || h.startsWith("fd") || h.startsWith("fe80:")) return true;
+  return false;
+}
+
+function isSafeResultUrl(raw: string): boolean {
+  let u: URL;
+  try { u = new URL(raw); } catch { return false; }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+  if (isUnsafeHost(u.hostname)) return false;
+  return true;
+}
+
+async function webSearch(query: string): Promise<SearchResult[]> {
+  const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+  const html = await fetchHtml(url);
+  const results: SearchResult[] = [];
+  // DuckDuckGo HTML wraps each result in <div class="result"> with a result__a link and result__snippet text.
+  // Anchored character classes ([^<]*?, [^>]+) keep the regex linear and avoid catastrophic backtracking.
+  const blockRe = /<a[^>]*class="[^"]*\bresult__a\b[^"]*"[^>]*href="([^"]+)"[^>]*>([^<]{1,400})<\/a>[\s\S]{0,2000}?<a[^>]*class="[^"]*\bresult__snippet\b[^"]*"[^>]*>([\s\S]{0,1500}?)<\/a>/g;
+  let m: RegExpExecArray | null;
+  let iters = 0;
+  while ((m = blockRe.exec(html)) && results.length < 5 && iters++ < 50) {
+    let href = decodeHtml(m[1] ?? "");
+    // Unwrap DuckDuckGo redirect: //duckduckgo.com/l/?uddg=ENCODED
+    const ddg = href.match(/[?&]uddg=([^&]+)/);
+    if (ddg && ddg[1]) {
+      try { href = decodeURIComponent(ddg[1]); } catch { /* keep as-is */ }
+    }
+    if (href.startsWith("//")) href = "https:" + href;
+    if (!isSafeResultUrl(href)) continue;
+    const title = stripTags(m[2] ?? "");
+    const snippet = stripTags(m[3] ?? "");
+    if (title) results.push({ title, url: href, snippet });
+  }
+  return results;
 }
 
 /* ── Bot context for system prompt ─────────────────────────────────────── */

@@ -58,6 +58,11 @@ import {
   Trash2,
   FolderTree,
   ExternalLink,
+  Globe,
+  RefreshCw,
+  Folder,
+  FolderOpen,
+  File as FileIcon,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -88,6 +93,7 @@ const TOOL_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
   install_packages: { label: "تثبيت حزم", icon: <Terminal size={13} /> },
   run_command:    { label: "تشغيل أمر", icon: <Terminal size={13} /> },
   get_bot_logs:   { label: "قراءة اللوغات", icon: <ScrollText size={13} /> },
+  web_search:     { label: "بحث في الويب", icon: <Globe size={13} /> },
   restart_bot:    { label: "إعادة تشغيل البوت", icon: <RotateCw size={13} /> },
   start_bot:      { label: "تشغيل البوت", icon: <Play size={13} /> },
   stop_bot:       { label: "إيقاف البوت", icon: <Square size={13} /> },
@@ -104,6 +110,104 @@ interface PendingAttachment {
   mediaType: ImgMime;
   data: string; // base64 (no prefix)
   preview: string; // data URL for thumbnail
+}
+
+/* ── Right-panel: file tree + bot logs types ───────────────────────────── */
+
+interface TreeNode {
+  name: string;
+  path: string;
+  type: "file" | "dir";
+  size?: number;
+  children?: TreeNode[];
+}
+
+interface BotLogEntry {
+  timestamp: string;
+  level: "info" | "error";
+  message: string;
+}
+
+const apiBase = () => import.meta.env.BASE_URL.replace(/\/$/, "");
+
+function formatBytes(n?: number): string {
+  if (!n && n !== 0) return "";
+  if (n < 1024) return `${n}B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)}KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)}MB`;
+}
+
+function FileTreeNode({
+  node,
+  depth,
+  openDirs,
+  toggleDir,
+  selectedPath,
+  recentlyTouched,
+  onSelectFile,
+}: {
+  node: TreeNode;
+  depth: number;
+  openDirs: Set<string>;
+  toggleDir: (p: string) => void;
+  selectedPath: string | null;
+  recentlyTouched: Set<string>;
+  onSelectFile: (n: TreeNode) => void;
+}) {
+  const isOpen = openDirs.has(node.path);
+  const isSelected = selectedPath === node.path;
+  const isRecent = recentlyTouched.has(node.path);
+  const indent = depth * 12;
+
+  if (node.type === "dir") {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => toggleDir(node.path)}
+          className={cn(
+            "w-full flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-muted/60 transition-colors text-left",
+            isRecent && "bg-primary/10"
+          )}
+          style={{ paddingInlineStart: 8 + indent }}
+        >
+          {isOpen ? <ChevronDown className="w-3 h-3 opacity-60 flex-shrink-0" /> : <ChevronRight className="w-3 h-3 opacity-60 flex-shrink-0" />}
+          {isOpen ? <FolderOpen className="w-3.5 h-3.5 text-primary flex-shrink-0" /> : <Folder className="w-3.5 h-3.5 text-primary/70 flex-shrink-0" />}
+          <span className="truncate font-medium">{node.name}</span>
+        </button>
+        {isOpen && node.children?.map((c) => (
+          <FileTreeNode
+            key={c.path}
+            node={c}
+            depth={depth + 1}
+            openDirs={openDirs}
+            toggleDir={toggleDir}
+            selectedPath={selectedPath}
+            recentlyTouched={recentlyTouched}
+            onSelectFile={onSelectFile}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelectFile(node)}
+      className={cn(
+        "w-full flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-muted/60 transition-colors text-left",
+        isSelected && "bg-primary/15 text-primary",
+        !isSelected && isRecent && "bg-primary/5"
+      )}
+      style={{ paddingInlineStart: 8 + indent + 14 }}
+    >
+      <FileIcon className="w-3.5 h-3.5 opacity-60 flex-shrink-0" />
+      <span className="truncate flex-1">{node.name}</span>
+      {isRecent && <span className="text-[9px] text-primary font-bold">●</span>}
+      <span className="text-[9px] text-muted-foreground/60 ltr-text">{formatBytes(node.size)}</span>
+    </button>
+  );
 }
 
 function fileToAttachment(file: File): Promise<PendingAttachment | null> {
@@ -563,6 +667,19 @@ export default function AgentPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [streamingEvents, setStreamingEvents] = useState<StreamEvent[]>([]);
+
+  /* ── Right panel: files + logs ─────────────────────────────────────── */
+  const [rightTab, setRightTab] = useState<"files" | "logs">("files");
+  const [fileTree, setFileTree] = useState<TreeNode[]>([]);
+  const [treeLoading, setTreeLoading] = useState(false);
+  const [openDirs, setOpenDirs] = useState<Set<string>>(new Set([""]));
+  const [selectedFile, setSelectedFile] = useState<TreeNode | null>(null);
+  const [fileContent, setFileContent] = useState<string>("");
+  const [contentLoading, setContentLoading] = useState(false);
+  const [contentError, setContentError] = useState<string | null>(null);
+  const [recentlyTouched, setRecentlyTouched] = useState<Set<string>>(new Set());
+  const [botLogs, setBotLogs] = useState<BotLogEntry[]>([]);
+  const logScrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -590,6 +707,147 @@ export default function AgentPage() {
       inputRef.current?.focus();
     }
   }, [activeConvId]);
+
+  /* ── Right panel: data fetchers ─────────────────────────────────────── */
+
+  const linkedBotId = activeConv?.botId ?? null;
+
+  const fetchTree = useCallback(async (botId: string) => {
+    setTreeLoading(true);
+    try {
+      const r = await fetch(`${apiBase()}/api/bots/${botId}/files/tree`);
+      if (!r.ok) throw new Error(`tree ${r.status}`);
+      const json = await r.json() as { tree: TreeNode[] };
+      setFileTree(json.tree ?? []);
+    } catch {
+      setFileTree([]);
+    } finally {
+      setTreeLoading(false);
+    }
+  }, []);
+
+  const fetchFileContent = useCallback(async (botId: string, path: string) => {
+    setContentLoading(true);
+    setContentError(null);
+    setFileContent("");
+    try {
+      const r = await fetch(`${apiBase()}/api/bots/${botId}/files/content?path=${encodeURIComponent(path)}`);
+      const json = await r.json() as { content?: string; error?: string };
+      if (!r.ok) {
+        setContentError(json.error ?? `error ${r.status}`);
+      } else {
+        setFileContent(json.content ?? "");
+      }
+    } catch (e) {
+      setContentError((e as Error).message);
+    } finally {
+      setContentLoading(false);
+    }
+  }, []);
+
+  const fetchLogs = useCallback(async (botId: string) => {
+    try {
+      const r = await fetch(`${apiBase()}/api/bots/${botId}/logs`);
+      if (!r.ok) return;
+      const json = await r.json() as { logs?: BotLogEntry[] };
+      setBotLogs(json.logs ?? []);
+    } catch { /* ignore */ }
+  }, []);
+
+  // Initial tree load when conversation/bot changes
+  useEffect(() => {
+    if (linkedBotId) {
+      void fetchTree(linkedBotId);
+      void fetchLogs(linkedBotId);
+      setSelectedFile(null);
+      setFileContent("");
+      setRecentlyTouched(new Set());
+    } else {
+      setFileTree([]);
+      setBotLogs([]);
+    }
+  }, [linkedBotId, fetchTree, fetchLogs]);
+
+  // Refresh tree after streaming ends + track touched files for highlight
+  const wasStreamingRef = useRef(false);
+  useEffect(() => {
+    if (wasStreamingRef.current && !streaming && linkedBotId) {
+      void fetchTree(linkedBotId);
+      void fetchLogs(linkedBotId);
+      // Refresh selected file content if agent might have changed it
+      if (selectedFile) {
+        void fetchFileContent(linkedBotId, selectedFile.path);
+      }
+    }
+    wasStreamingRef.current = streaming;
+  }, [streaming, linkedBotId, fetchTree, fetchLogs, fetchFileContent, selectedFile]);
+
+  // Track files the agent just touched (highlight in tree)
+  useEffect(() => {
+    const lastResult = [...streamingEvents].reverse().find(
+      (e): e is Extract<StreamEvent, { type: "tool_result" }> => e.type === "tool_result",
+    );
+    if (!lastResult) return;
+    if (!["write_file", "delete_file", "write_bot_file"].includes(lastResult.name)) return;
+    const matchingRunning = streamingEvents.find(
+      (e): e is Extract<StreamEvent, { type: "tool_running" }> =>
+        e.type === "tool_running" && e.id === lastResult.id,
+    );
+    const path = matchingRunning?.input["path"];
+    if (typeof path === "string" && path.trim()) {
+      setRecentlyTouched(prev => {
+        const next = new Set(prev);
+        next.add(path);
+        // Bubble up to parent dirs (cheap, bounded by path depth)
+        const parts = path.split("/");
+        for (let i = 1; i < parts.length; i++) next.add(parts.slice(0, i).join("/"));
+        // Cap to 50 entries — drop oldest insertions if exceeded
+        if (next.size > 50) {
+          const trimmed = Array.from(next).slice(-50);
+          return new Set(trimmed);
+        }
+        return next;
+      });
+      // Clear individual highlight after 8s
+      setTimeout(() => {
+        setRecentlyTouched(prev => {
+          if (!prev.has(path)) return prev;
+          const next = new Set(prev);
+          next.delete(path);
+          return next;
+        });
+      }, 8000);
+    }
+  }, [streamingEvents]);
+
+  // Poll bot logs every 2s when bot is running
+  useEffect(() => {
+    if (!linkedBotId) return;
+    const bot = botsData.find(b => b.id === linkedBotId);
+    if (bot?.status !== "running") return;
+    const interval = setInterval(() => { void fetchLogs(linkedBotId); }, 2500);
+    return () => clearInterval(interval);
+  }, [linkedBotId, botsData, fetchLogs]);
+
+  // Auto-scroll log panel to bottom on new logs
+  useEffect(() => {
+    if (rightTab === "logs" && logScrollRef.current) {
+      logScrollRef.current.scrollTop = logScrollRef.current.scrollHeight;
+    }
+  }, [botLogs, rightTab]);
+
+  const toggleDir = useCallback((path: string) => {
+    setOpenDirs(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path); else next.add(path);
+      return next;
+    });
+  }, []);
+
+  const handleSelectFile = useCallback((node: TreeNode) => {
+    setSelectedFile(node);
+    if (linkedBotId) void fetchFileContent(linkedBotId, node.path);
+  }, [linkedBotId, fetchFileContent]);
 
   const handleNewConv = async (title: string, botId?: string) => {
     const conv = await createConv.mutateAsync({ data: { title, botId: botId ?? null } });
@@ -786,6 +1044,9 @@ export default function AgentPage() {
   const linkedBot = activeConv?.botId
     ? botsData.find((b) => b.id === activeConv.botId)
     : null;
+
+  const linkedBotForPanel = linkedBotId ? botsData.find(b => b.id === linkedBotId) : null;
+  const showRightPanel = !!activeConvId && !!linkedBotForPanel;
 
   return (
     <Layout>
@@ -1041,6 +1302,167 @@ export default function AgentPage() {
             </>
           )}
         </div>
+
+        {showRightPanel && linkedBotForPanel && (
+          <div className="w-80 border-l border-border/50 flex flex-col bg-muted/10 flex-shrink-0">
+            <div className="flex border-b border-border/50 bg-background/50">
+              <button
+                type="button"
+                onClick={() => setRightTab("files")}
+                className={cn(
+                  "flex-1 px-3 py-2.5 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors",
+                  rightTab === "files"
+                    ? "bg-background text-foreground border-b-2 border-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <FolderTree className="w-3.5 h-3.5" />
+                الملفات
+                {fileTree.length > 0 && (
+                  <span className="text-[10px] text-muted-foreground/60">({fileTree.length})</span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setRightTab("logs")}
+                className={cn(
+                  "flex-1 px-3 py-2.5 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors",
+                  rightTab === "logs"
+                    ? "bg-background text-foreground border-b-2 border-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <ScrollText className="w-3.5 h-3.5" />
+                السجلات
+                {linkedBotForPanel.status === "running" && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                )}
+              </button>
+            </div>
+
+            {rightTab === "files" ? (
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-border/30">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                    شجرة المشروع
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => linkedBotId && void fetchTree(linkedBotId)}
+                    disabled={treeLoading}
+                    className="text-muted-foreground hover:text-foreground p-0.5 rounded"
+                    title="تحديث"
+                  >
+                    <RefreshCw className={cn("w-3 h-3", treeLoading && "animate-spin")} />
+                  </button>
+                </div>
+                <ScrollArea className="flex-1 max-h-[40%]">
+                  <div className="py-1">
+                    {fileTree.length === 0 && !treeLoading && (
+                      <p className="px-3 py-6 text-xs text-muted-foreground/60 text-center">
+                        لا توجد ملفات بعد. اطلب من الوكيل البدء في البناء.
+                      </p>
+                    )}
+                    {fileTree.map(node => (
+                      <FileTreeNode
+                        key={node.path || node.name}
+                        node={node}
+                        depth={0}
+                        openDirs={openDirs}
+                        toggleDir={toggleDir}
+                        selectedPath={selectedFile?.path ?? null}
+                        recentlyTouched={recentlyTouched}
+                        onSelectFile={handleSelectFile}
+                      />
+                    ))}
+                  </div>
+                </ScrollArea>
+
+                <div className="flex-1 min-h-0 border-t border-border/50 flex flex-col bg-background/40">
+                  {selectedFile ? (
+                    <>
+                      <div className="px-3 py-1.5 border-b border-border/30 flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-mono truncate text-foreground/80" dir="ltr">
+                          {selectedFile.path}
+                        </span>
+                        <span className="text-[9px] text-muted-foreground/60 ltr-text flex-shrink-0">
+                          {formatBytes(selectedFile.size)}
+                        </span>
+                      </div>
+                      <ScrollArea className="flex-1">
+                        {contentLoading && (
+                          <p className="px-3 py-4 text-xs text-muted-foreground">جاري التحميل...</p>
+                        )}
+                        {contentError && (
+                          <p className="px-3 py-4 text-xs text-destructive" dir="ltr">{contentError}</p>
+                        )}
+                        {!contentLoading && !contentError && (
+                          <pre className="text-[10px] leading-snug font-mono p-3 whitespace-pre-wrap break-words text-foreground/85" dir="ltr">
+                            {fileContent || "(empty file)"}
+                          </pre>
+                        )}
+                      </ScrollArea>
+                    </>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center px-4 text-center">
+                      <p className="text-xs text-muted-foreground/60">
+                        اختر ملفاً من الشجرة أعلاه لمعاينة محتواه
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-border/30">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                      سجلات البوت
+                    </span>
+                    <Badge variant="outline" className="text-[9px] py-0 px-1 h-4">
+                      {linkedBotForPanel.status === "running" ? "نشط" :
+                       linkedBotForPanel.status === "stopped" ? "متوقف" :
+                       linkedBotForPanel.status === "crashed" ? "تعطّل" : linkedBotForPanel.status}
+                    </Badge>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => linkedBotId && void fetchLogs(linkedBotId)}
+                    className="text-muted-foreground hover:text-foreground p-0.5 rounded"
+                    title="تحديث"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                  </button>
+                </div>
+                <div ref={logScrollRef} className="flex-1 overflow-y-auto bg-background/60 font-mono text-[10px]">
+                  {botLogs.length === 0 ? (
+                    <p className="px-3 py-6 text-xs text-muted-foreground/60 text-center font-sans">
+                      لا توجد سجلات بعد. شغّل البوت لرؤية الإخراج المباشر.
+                    </p>
+                  ) : (
+                    <div className="py-1">
+                      {botLogs.slice(-200).map((l, i) => (
+                        <div
+                          key={i}
+                          dir="ltr"
+                          className={cn(
+                            "px-3 py-0.5 leading-relaxed border-b border-border/10",
+                            l.level === "error" ? "text-red-500/90 bg-red-500/5" : "text-foreground/75"
+                          )}
+                        >
+                          <span className="text-muted-foreground/50 me-2">
+                            {new Date(l.timestamp).toLocaleTimeString("en-US", { hour12: false })}
+                          </span>
+                          <span className="whitespace-pre-wrap break-words">{l.message}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <NewConvDialog

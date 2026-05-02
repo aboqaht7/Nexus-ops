@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request } from "express";
 import multer from "multer";
-import { join, extname, basename } from "path";
-import { readFileSync, unlinkSync, existsSync } from "fs";
+import { join, extname, basename, resolve, sep, relative } from "path";
+import { readFileSync, unlinkSync, existsSync, readdirSync, statSync, lstatSync } from "fs";
 import { getAuth } from "@clerk/express";
 import {
   listBots,
@@ -14,6 +14,7 @@ import {
   getStats,
   registerBot,
   getBotFilesDir,
+  getBotDir,
   PROJECT_TYPES,
   type BotLanguage,
   type ProjectType,
@@ -1158,6 +1159,114 @@ router.get("/bots/:id/logs", (req, res): void => {
   }
 
   res.json(GetBotLogsResponse.parse({ id: params.data.id, logs }));
+});
+
+/* ── File-tree explorer endpoints (read-only, scoped to bot dir) ────────── */
+
+const FILE_TREE_IGNORE = new Set([
+  "node_modules", ".venv", "venv", "__pycache__", ".git", "dist", "build", ".next", ".cache",
+]);
+const FILE_TREE_MAX_ENTRIES = 800;
+const FILE_TREE_MAX_DEPTH = 8;
+const FILE_CONTENT_MAX_BYTES = 512 * 1024; // 512KB
+const TEXT_EXTS = new Set([
+  ".html", ".htm", ".css", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx",
+  ".json", ".md", ".txt", ".py", ".yml", ".yaml", ".toml", ".xml", ".svg",
+  ".env", ".sh", ".gitignore", ".csv", ".sql", ".vue", ".astro",
+]);
+
+interface TreeNode {
+  name: string;
+  path: string;
+  type: "file" | "dir";
+  size?: number;
+  children?: TreeNode[];
+}
+
+function buildTree(absDir: string, root: string, depth: number, counter: { n: number }): TreeNode[] {
+  if (depth > FILE_TREE_MAX_DEPTH) return [];
+  let names: string[];
+  try { names = readdirSync(absDir); } catch { return []; }
+  const out: TreeNode[] = [];
+  for (const name of names.sort((a, b) => a.localeCompare(b))) {
+    if (counter.n >= FILE_TREE_MAX_ENTRIES) break;
+    if (FILE_TREE_IGNORE.has(name) || name.startsWith(".replit") || name === ".pythonlibs") continue;
+    const full = join(absDir, name);
+    // Detect symlinks WITHOUT following them — prevents loops
+    let ls; try { ls = lstatSync(full); } catch { continue; }
+    if (ls.isSymbolicLink()) continue;
+    let s; try { s = statSync(full); } catch { continue; }
+    counter.n++;
+    const rel = relative(root, full).split(sep).join("/");
+    if (s.isDirectory()) {
+      out.push({
+        name,
+        path: rel,
+        type: "dir",
+        children: buildTree(full, root, depth + 1, counter),
+      });
+    } else {
+      out.push({ name, path: rel, type: "file", size: s.size });
+    }
+  }
+  out.sort((a, b) => (a.type === b.type ? 0 : a.type === "dir" ? -1 : 1));
+  return out;
+}
+
+router.get("/bots/:id/files/tree", (req, res): void => {
+  const id = req.params["id"];
+  if (typeof id !== "string" || !id) {
+    res.status(400).json({ error: "id is required" });
+    return;
+  }
+  const bot = getBot(id);
+  if (!bot) { res.status(404).json({ error: "Bot not found" }); return; }
+  const root = resolve(getBotDir(id));
+  if (!existsSync(root)) { res.json({ id, root: "", tree: [] }); return; }
+  const counter = { n: 0 };
+  const tree = buildTree(root, root, 0, counter);
+  res.json({ id, count: counter.n, tree });
+});
+
+router.get("/bots/:id/files/content", (req, res): void => {
+  const id = req.params["id"];
+  const rawPath = req.query["path"];
+  if (typeof id !== "string" || !id) {
+    res.status(400).json({ error: "id is required" });
+    return;
+  }
+  if (typeof rawPath !== "string" || !rawPath.trim()) {
+    res.status(400).json({ error: "path is required" });
+    return;
+  }
+  const bot = getBot(id);
+  if (!bot) { res.status(404).json({ error: "Bot not found" }); return; }
+
+  const root = resolve(getBotDir(id));
+  const rootSep = root.endsWith(sep) ? root : root + sep;
+  const trimmed = rawPath.trim().replace(/^\/+/, "");
+  if (trimmed.includes("\0")) { res.status(400).json({ error: "invalid path" }); return; }
+  const abs = resolve(join(root, trimmed));
+  if (abs !== root && !abs.startsWith(rootSep)) {
+    res.status(400).json({ error: "path escapes project" });
+    return;
+  }
+  if (!existsSync(abs)) { res.status(404).json({ error: "file not found" }); return; }
+  const s = statSync(abs);
+  if (s.isDirectory()) { res.status(400).json({ error: "path is a directory" }); return; }
+  if (s.size > FILE_CONTENT_MAX_BYTES) {
+    res.status(413).json({ error: `file too large (${s.size} bytes, max ${FILE_CONTENT_MAX_BYTES})`, size: s.size });
+    return;
+  }
+  const ext = extname(abs).toLowerCase();
+  const isText = TEXT_EXTS.has(ext) || s.size < 64 * 1024;
+  if (!isText) { res.status(415).json({ error: "binary file (preview not supported)", size: s.size, ext }); return; }
+  try {
+    const content = readFileSync(abs, "utf-8");
+    res.json({ id, path: trimmed, size: s.size, ext, content });
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message });
+  }
 });
 
 export default router;
