@@ -21,7 +21,7 @@ router.post("/agent/deploy", async (req, res) => {
   const filePath = join(botFilesDir, filename);
   writeFileSync(filePath, body.code, "utf-8");
 
-  const bot = registerBot(body.name, filename);
+  const bot = registerBot(body.name, filename, body.code, body.language);
 
   res.status(201).json(bot);
 });

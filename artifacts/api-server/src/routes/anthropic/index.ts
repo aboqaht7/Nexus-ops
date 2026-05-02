@@ -244,7 +244,7 @@ router.post("/anthropic/conversations/:id/messages", async (req, res) => {
 
       // Add assistant turn with tool_use blocks
       const assistantContent: Anthropic.ContentBlock[] = [];
-      if (currentText) assistantContent.push({ type: "text", text: currentText });
+      if (currentText) assistantContent.push({ type: "text", text: currentText, citations: null } as Anthropic.ContentBlock);
       for (const block of toolUseBlocks) {
         const { _inputStr: _s, ...clean } = block;
         assistantContent.push(clean as Anthropic.ToolUseBlock);
