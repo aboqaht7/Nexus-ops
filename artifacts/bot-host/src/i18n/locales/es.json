@@ -100,5 +100,41 @@
     "newConversation": "Nueva conversación",
     "messagePlaceholder": "Pídele cualquier cosa a Agent-4...",
     "send": "Enviar"
+  },
+  "checkout": {
+    "title": "Completar suscripción",
+    "subtitleMonthly": "suscripción mensual · cancela cuando quieras.",
+    "subtitleYearly": "suscripción anual (2 meses gratis) · cancela cuando quieras.",
+    "monthly": "Mensual",
+    "yearly": "Anual",
+    "save17": "Ahorra 17%",
+    "perMonth": "/mes",
+    "perYear": "/año",
+    "saved2Months": "🎉 Ahorraste {{amount}} SAR (2 meses gratis)",
+    "paymentDetails": "Datos de pago",
+    "loadingGateway": "Cargando pasarela de pago...",
+    "loadFailed": "No se pudo cargar la pasarela. Comprueba tu conexión.",
+    "missingKey": "Clave de Moyasar no configurada — verifica la configuración.",
+    "initError": "Error al inicializar la pasarela de pago.",
+    "secureBadge": "Pago seguro y cifrado",
+    "trustSsl": "Pagos cifrados con SSL",
+    "trustNoStore": "Nunca guardamos los datos de tu tarjeta",
+    "trustCancel": "Cancela en cualquier momento, sin cargos",
+    "acceptedMethods": "Métodos de pago aceptados",
+    "poweredBy": "Con tecnología de",
+    "loginRequired": "Inicia sesión para continuar con el pago.",
+    "signInBtn": "Iniciar sesión"
+  },
+  "paymentSuccess": {
+    "loadingTitle": "Activando tu suscripción...",
+    "loadingSubtitle": "Verificando el pago y activando tu cuenta.",
+    "successTitle": "¡Suscripción activada!",
+    "successMsg": "Recibimos tu pago y activamos tu suscripción correctamente.",
+    "goDashboard": "Ir al panel",
+    "failedTitle": "Problema de activación",
+    "failedDefault": "No se pudo verificar el pago. Contacta con soporte.",
+    "failedFromMoyasar": "El pago falló. Inténtalo de nuevo.",
+    "retry": "Reintentar",
+    "contactSupport": "Contactar soporte"
   }
 }

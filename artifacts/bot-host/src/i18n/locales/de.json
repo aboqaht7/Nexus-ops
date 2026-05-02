@@ -100,5 +100,41 @@
     "newConversation": "Neue Konversation",
     "messagePlaceholder": "Frag Agent-4 alles...",
     "send": "Senden"
+  },
+  "checkout": {
+    "title": "Abonnement abschließen",
+    "subtitleMonthly": "monatliches Abonnement · jederzeit kündbar.",
+    "subtitleYearly": "jährliches Abonnement (2 Monate gratis) · jederzeit kündbar.",
+    "monthly": "Monatlich",
+    "yearly": "Jährlich",
+    "save17": "Sparen Sie 17%",
+    "perMonth": "/Monat",
+    "perYear": "/Jahr",
+    "saved2Months": "🎉 Sie haben {{amount}} SAR gespart (2 Monate gratis)",
+    "paymentDetails": "Zahlungsdetails",
+    "loadingGateway": "Zahlungsgateway wird geladen...",
+    "loadFailed": "Gateway konnte nicht geladen werden. Internetverbindung prüfen.",
+    "missingKey": "Moyasar-Schlüssel nicht konfiguriert — bitte Einstellungen überprüfen.",
+    "initError": "Fehler bei der Initialisierung des Zahlungsgateways.",
+    "secureBadge": "Sichere verschlüsselte Zahlung",
+    "trustSsl": "SSL-verschlüsselte Zahlungen",
+    "trustNoStore": "Wir speichern niemals Ihre Kartendaten",
+    "trustCancel": "Jederzeit kündbar, keine Gebühren",
+    "acceptedMethods": "Akzeptierte Zahlungsmethoden",
+    "poweredBy": "Bereitgestellt von",
+    "loginRequired": "Bitte melden Sie sich an, um die Zahlung fortzusetzen.",
+    "signInBtn": "Anmelden"
+  },
+  "paymentSuccess": {
+    "loadingTitle": "Ihr Abonnement wird aktiviert...",
+    "loadingSubtitle": "Zahlung wird überprüft und Konto aktiviert.",
+    "successTitle": "Abonnement aktiviert!",
+    "successMsg": "Wir haben Ihre Zahlung erhalten und Ihr Abonnement aktiviert.",
+    "goDashboard": "Zum Dashboard",
+    "failedTitle": "Aktivierungsproblem",
+    "failedDefault": "Zahlung konnte nicht überprüft werden. Bitte Support kontaktieren.",
+    "failedFromMoyasar": "Zahlung fehlgeschlagen. Bitte erneut versuchen.",
+    "retry": "Erneut versuchen",
+    "contactSupport": "Support kontaktieren"
   }
 }

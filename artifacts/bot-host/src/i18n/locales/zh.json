@@ -100,5 +100,41 @@
     "newConversation": "新对话",
     "messagePlaceholder": "向 Agent-4 提问...",
     "send": "发送"
+  },
+  "checkout": {
+    "title": "完成订阅",
+    "subtitleMonthly": "月度订阅 · 随时可取消。",
+    "subtitleYearly": "年度订阅（赠送2个月）· 随时可取消。",
+    "monthly": "月付",
+    "yearly": "年付",
+    "save17": "节省 17%",
+    "perMonth": "/月",
+    "perYear": "/年",
+    "saved2Months": "🎉 您节省了 {{amount}} SAR（赠送2个月）",
+    "paymentDetails": "支付详情",
+    "loadingGateway": "正在加载支付网关...",
+    "loadFailed": "无法加载支付网关。请检查您的网络连接。",
+    "missingKey": "Moyasar 密钥未配置 — 请检查项目设置。",
+    "initError": "初始化支付网关时出错。",
+    "secureBadge": "安全加密支付",
+    "trustSsl": "SSL 加密支付",
+    "trustNoStore": "我们绝不存储您的银行卡信息",
+    "trustCancel": "随时取消，无任何费用",
+    "acceptedMethods": "支持的支付方式",
+    "poweredBy": "技术支持",
+    "loginRequired": "请登录以继续付款。",
+    "signInBtn": "登录"
+  },
+  "paymentSuccess": {
+    "loadingTitle": "正在激活您的订阅...",
+    "loadingSubtitle": "正在验证付款并激活您的账户。",
+    "successTitle": "订阅已激活！",
+    "successMsg": "我们已收到您的付款并成功激活您的订阅。",
+    "goDashboard": "前往控制台",
+    "failedTitle": "激活问题",
+    "failedDefault": "无法验证付款状态。请联系支持。",
+    "failedFromMoyasar": "付款失败。请重试。",
+    "retry": "重试",
+    "contactSupport": "联系支持"
   }
 }

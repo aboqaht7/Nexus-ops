@@ -100,5 +100,41 @@
     "newConversation": "Nouvelle conversation",
     "messagePlaceholder": "Demandez n'importe quoi à Agent-4...",
     "send": "Envoyer"
+  },
+  "checkout": {
+    "title": "Finaliser votre abonnement",
+    "subtitleMonthly": "abonnement mensuel · annulable à tout moment.",
+    "subtitleYearly": "abonnement annuel (2 mois offerts) · annulable à tout moment.",
+    "monthly": "Mensuel",
+    "yearly": "Annuel",
+    "save17": "Économisez 17%",
+    "perMonth": "/mois",
+    "perYear": "/an",
+    "saved2Months": "🎉 Vous avez économisé {{amount}} SAR (2 mois offerts)",
+    "paymentDetails": "Détails du paiement",
+    "loadingGateway": "Chargement de la passerelle de paiement...",
+    "loadFailed": "Impossible de charger la passerelle. Vérifiez votre connexion.",
+    "missingKey": "Clé Moyasar non configurée — vérifiez les paramètres.",
+    "initError": "Erreur lors de l'initialisation de la passerelle de paiement.",
+    "secureBadge": "Paiement sécurisé et chiffré",
+    "trustSsl": "Paiements chiffrés SSL",
+    "trustNoStore": "Vos données de carte ne sont jamais stockées",
+    "trustCancel": "Annulation immédiate, sans frais",
+    "acceptedMethods": "Moyens de paiement acceptés",
+    "poweredBy": "Propulsé par",
+    "loginRequired": "Veuillez vous connecter pour finaliser le paiement.",
+    "signInBtn": "Se connecter"
+  },
+  "paymentSuccess": {
+    "loadingTitle": "Activation de votre abonnement...",
+    "loadingSubtitle": "Vérification du paiement et activation du compte.",
+    "successTitle": "Abonnement activé !",
+    "successMsg": "Nous avons reçu votre paiement et activé votre abonnement.",
+    "goDashboard": "Aller au tableau de bord",
+    "failedTitle": "Problème d'activation",
+    "failedDefault": "Impossible de vérifier le paiement. Contactez le support.",
+    "failedFromMoyasar": "Le paiement a échoué. Veuillez réessayer.",
+    "retry": "Réessayer",
+    "contactSupport": "Contacter le support"
   }
 }

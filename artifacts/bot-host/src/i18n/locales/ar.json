@@ -100,5 +100,41 @@
     "newConversation": "محادثة جديدة",
     "messagePlaceholder": "اطلب من Agent-4 ما تريده...",
     "send": "إرسال"
+  },
+  "checkout": {
+    "title": "إتمام الاشتراك",
+    "subtitleMonthly": "اشتراك شهري · يُلغى في أي وقت.",
+    "subtitleYearly": "اشتراك سنوي (شهران مجاناً) · يُلغى في أي وقت.",
+    "monthly": "شهري",
+    "yearly": "سنوي",
+    "save17": "وفّر 17%",
+    "perMonth": "/شهر",
+    "perYear": "/سنة",
+    "saved2Months": "🎉 وفّرت {{amount}} ر.س (شهران مجاناً)",
+    "paymentDetails": "بيانات الدفع",
+    "loadingGateway": "جاري تحميل بوابة الدفع...",
+    "loadFailed": "تعذّر تحميل بوابة الدفع. تحقق من اتصالك بالإنترنت.",
+    "missingKey": "مفتاح ميسر غير مضبوط — يرجى التحقق من إعدادات المشروع.",
+    "initError": "حدث خطأ أثناء تهيئة بوابة الدفع.",
+    "secureBadge": "دفع آمن ومشفّر",
+    "trustSsl": "مدفوعات مشفّرة بـ SSL",
+    "trustNoStore": "لا نخزن بيانات بطاقتك",
+    "trustCancel": "إلغاء فوري بدون رسوم",
+    "acceptedMethods": "وسائل الدفع المقبولة",
+    "poweredBy": "مدعوم بـ",
+    "loginRequired": "الرجاء تسجيل الدخول لإتمام الدفع.",
+    "signInBtn": "تسجيل الدخول"
+  },
+  "paymentSuccess": {
+    "loadingTitle": "جاري تفعيل اشتراكك...",
+    "loadingSubtitle": "نتحقق من الدفع ونفعّل حسابك.",
+    "successTitle": "تم تفعيل الاشتراك!",
+    "successMsg": "تم استلام دفعتك وتفعيل اشتراكك بنجاح.",
+    "goDashboard": "الانتقال للوحة التحكم",
+    "failedTitle": "مشكلة في التفعيل",
+    "failedDefault": "لم نتمكن من التحقق من حالة الدفع. تواصل مع الدعم.",
+    "failedFromMoyasar": "فشلت عملية الدفع. حاول مرة أخرى.",
+    "retry": "إعادة المحاولة",
+    "contactSupport": "تواصل مع الدعم"
   }
 }

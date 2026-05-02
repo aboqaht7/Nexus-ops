@@ -100,5 +100,41 @@
     "newConversation": "新しい会話",
     "messagePlaceholder": "Agent-4 に何でも聞いてください...",
     "send": "送信"
+  },
+  "checkout": {
+    "title": "サブスクリプションを完了",
+    "subtitleMonthly": "月額プラン · いつでもキャンセル可能。",
+    "subtitleYearly": "年額プラン（2か月無料）· いつでもキャンセル可能。",
+    "monthly": "月額",
+    "yearly": "年額",
+    "save17": "17% お得",
+    "perMonth": "/月",
+    "perYear": "/年",
+    "saved2Months": "🎉 {{amount}} SAR お得になりました（2か月無料）",
+    "paymentDetails": "支払い情報",
+    "loadingGateway": "決済ゲートウェイを読み込み中...",
+    "loadFailed": "決済ゲートウェイを読み込めませんでした。接続を確認してください。",
+    "missingKey": "Moyasar キーが未設定です — プロジェクト設定を確認してください。",
+    "initError": "決済ゲートウェイの初期化中にエラーが発生しました。",
+    "secureBadge": "安全に暗号化された支払い",
+    "trustSsl": "SSL 暗号化決済",
+    "trustNoStore": "カード情報は保存しません",
+    "trustCancel": "いつでもキャンセル可能、手数料なし",
+    "acceptedMethods": "利用可能な支払い方法",
+    "poweredBy": "提供:",
+    "loginRequired": "支払いを続行するにはサインインしてください。",
+    "signInBtn": "サインイン"
+  },
+  "paymentSuccess": {
+    "loadingTitle": "サブスクリプションを有効化中...",
+    "loadingSubtitle": "支払いを確認しアカウントを有効化しています。",
+    "successTitle": "サブスクリプションが有効になりました！",
+    "successMsg": "お支払いを受領し、サブスクリプションを有効化しました。",
+    "goDashboard": "ダッシュボードへ",
+    "failedTitle": "有効化の問題",
+    "failedDefault": "支払いを確認できませんでした。サポートにお問い合わせください。",
+    "failedFromMoyasar": "支払いに失敗しました。もう一度お試しください。",
+    "retry": "再試行",
+    "contactSupport": "サポートに連絡"
   }
 }

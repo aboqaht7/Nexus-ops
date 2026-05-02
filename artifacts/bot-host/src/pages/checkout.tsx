@@ -1,25 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { ArrowRight, Shield, Lock, Coins } from "lucide-react";
+import { ArrowLeft, ArrowRight, Shield, Lock, Coins, Sparkles, CheckCircle2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { useUser, useAuth, SignInButton } from "@clerk/react";
 
 declare global {
   interface Window {
     Moyasar: {
       init: (config: Record<string, unknown>) => void;
     };
-    ApplePaySession?: {
-      canMakePayments: () => boolean;
-      supportsVersion: (v: number) => boolean;
-    };
   }
 }
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const MOYASAR_KEY = (
-  import.meta.env.DEV
-    ? import.meta.env.VITE_MOYASAR_TEST_KEY
-    : import.meta.env.VITE_MOYASAR_PUBLISHABLE_KEY
-) as string;
+  (import.meta.env.VITE_MOYASAR_PUBLISHABLE_KEY as string | undefined) ||
+  (import.meta.env.VITE_MOYASAR_TEST_KEY as string | undefined) ||
+  ""
+);
 
 const R = {
   bg: "#FAF7F2",
@@ -29,68 +27,71 @@ const R = {
   muted: "#6B6B6B",
   border: "#E8DDD5",
   orange: "#F26207",
+  orangeDark: "#D95600",
   orangeLight: "#FEF3EC",
   purple: "#7C3AED",
   purpleLight: "#F5F3FF",
+  green: "#10B981",
 };
 
 interface PlanInfo {
-  nameAr: string;
-  label: string;
+  key: "pro" | "unlimited";
   monthlySar: number;
   yearlySar: number;
   color: string;
-  features: string[];
-  tokens: string;
+  light: string;
+  tokensKey: string;
+  featureKeys: string[];
 }
 
 const PLANS: Record<string, PlanInfo> = {
   pro: {
-    nameAr: "NexusOps Pro",
-    label: "Pro",
+    key: "pro",
     monthlySar: 37,
     yearlySar: 370,
     color: R.orange,
-    tokens: "500 توكن / شهر",
-    features: [
-      "حتى 5 بوتات",
-      "500 توكن Agent-4 شهرياً",
-      "بوتات بدون انقطاع 24/7",
-      "أولوية في الموارد",
-      "نسخ احتياطي تلقائي يومي",
-      "مزامنة GitHub",
-      "دعم فوري عبر Discord",
-      "إزالة شعار NexusOps",
+    light: R.orangeLight,
+    tokensKey: "500 tokens / mo",
+    featureKeys: [
+      "Up to 5 projects",
+      "500 Agent-4 tokens / mo",
+      "24/7 uptime",
+      "Priority resources",
+      "Daily auto backups",
+      "GitHub sync",
+      "Discord priority support",
+      "Remove NexusOps badge",
     ],
   },
   unlimited: {
-    nameAr: "NexusOps Unlimited",
-    label: "Unlimited",
+    key: "unlimited",
     monthlySar: 75,
     yearlySar: 750,
     color: R.purple,
-    tokens: "توكنات غير محدودة",
-    features: [
-      "بوتات غير محدودة",
-      "توكنات Agent-4 غير محدودة",
-      "كل مميزات Pro",
-      "موارد حصرية مضاعفة",
-      "دعم SLA مضمون",
-      "API مخصص",
-      "بيئات Dev/Prod",
-      "لوحة تحكم مؤسسية",
+    light: R.purpleLight,
+    tokensKey: "Unlimited tokens",
+    featureKeys: [
+      "Unlimited projects",
+      "Unlimited Agent-4 tokens",
+      "Everything in Pro",
+      "Doubled exclusive resources",
+      "SLA-guaranteed support",
+      "Custom API access",
+      "Dev / Prod environments",
+      "Enterprise dashboard",
     ],
   },
 };
 
-function getParams() {
+function getParams(): { plan: string; billing: string } {
   const params = new URLSearchParams(window.location.search);
-  const plan = params.get("plan") ?? "pro";
-  const billing = params.get("billing") ?? "monthly";
-  return { plan, billing };
+  return {
+    plan: params.get("plan") ?? "pro",
+    billing: params.get("billing") ?? "monthly",
+  };
 }
 
-/* ─── Moyasar form sub-component — remounts on key change ───────────── */
+/* ─── Moyasar form sub-component — fully remounts on key change ─────── */
 interface MoyasarFormProps {
   amount: number;
   description: string;
@@ -99,50 +100,45 @@ interface MoyasarFormProps {
   planName: string;
   accentColor: string;
   accentLight: string;
+  userId: string;
 }
 
-function MoyasarForm({ amount, description, planKey, billing, planName, accentColor, accentLight }: MoyasarFormProps) {
+function MoyasarForm({ amount, description, planKey, billing, planName, accentColor, accentLight, userId }: MoyasarFormProps) {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<"loading-sdk" | "ready" | "error">("loading-sdk");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const initialized = useRef(false);
   const formId = `mysr-${planKey}-${billing}`;
 
-  /* Load Moyasar SDK once */
+  /* Load Moyasar SDK once globally */
   useEffect(() => {
-    const loadSdk = () => {
-      if (window.Moyasar) { setStatus("ready"); return; }
+    if (window.Moyasar) { setStatus("ready"); return; }
 
-      if (!document.getElementById("moyasar-css")) {
-        const link = document.createElement("link");
-        link.id = "moyasar-css";
-        link.rel = "stylesheet";
-        link.href = "https://cdn.moyasar.com/mpf/1.14.0/moyasar.css";
-        document.head.appendChild(link);
-      }
+    if (!document.getElementById("moyasar-css")) {
+      const link = document.createElement("link");
+      link.id = "moyasar-css";
+      link.rel = "stylesheet";
+      link.href = "https://cdn.moyasar.com/mpf/1.14.0/moyasar.css";
+      document.head.appendChild(link);
+    }
 
-      if (document.getElementById("moyasar-js")) {
-        if (window.Moyasar) setStatus("ready");
-        else {
-          const existing = document.getElementById("moyasar-js") as HTMLScriptElement;
-          existing.addEventListener("load", () => setStatus("ready"), { once: true });
-        }
-        return;
-      }
+    const existing = document.getElementById("moyasar-js") as HTMLScriptElement | null;
+    if (existing) {
+      existing.addEventListener("load", () => setStatus("ready"), { once: true });
+      return;
+    }
 
-      const script = document.createElement("script");
-      script.id = "moyasar-js";
-      script.src = "https://cdn.moyasar.com/mpf/1.14.0/moyasar.js";
-      script.async = true;
-      script.onload = () => setStatus("ready");
-      script.onerror = () => {
-        setStatus("error");
-        setErrorMsg("تعذّر تحميل بوابة الدفع. تحقق من اتصالك بالإنترنت.");
-      };
-      document.head.appendChild(script);
+    const script = document.createElement("script");
+    script.id = "moyasar-js";
+    script.src = "https://cdn.moyasar.com/mpf/1.14.0/moyasar.js";
+    script.async = true;
+    script.onload = () => setStatus("ready");
+    script.onerror = () => {
+      setStatus("error");
+      setErrorMsg(t("checkout.loadFailed"));
     };
-
-    loadSdk();
-  }, []);
+    document.head.appendChild(script);
+  }, [t]);
 
   /* Init Moyasar when SDK is ready */
   useEffect(() => {
@@ -150,14 +146,11 @@ function MoyasarForm({ amount, description, planKey, billing, planName, accentCo
     if (!window.Moyasar) return;
     if (!MOYASAR_KEY) {
       setStatus("error");
-      setErrorMsg("مفتاح ميسر غير مضبوط — يرجى التحقق من إعدادات المشروع.");
+      setErrorMsg(t("checkout.missingKey"));
       return;
     }
 
     initialized.current = true;
-
-    // Always include all methods — Moyasar SDK handles device detection itself
-    const methods = ["applepay", "creditcard", "stcpay"];
 
     const callbackUrl = `${window.location.origin}${base}/payment-success?plan=${planKey}&billing=${billing}`;
 
@@ -168,7 +161,14 @@ function MoyasarForm({ amount, description, planKey, billing, planName, accentCo
       description,
       publishable_api_key: MOYASAR_KEY,
       callback_url: callbackUrl,
-      methods,
+      // Webhook on the server reads these to activate the subscription server-side
+      // even if the user closes the tab after paying.
+      metadata: {
+        userId,
+        plan: planKey,
+        billing,
+      },
+      methods: ["applepay", "creditcard", "stcpay"],
       apple_pay: {
         country: "SA",
         label: planName,
@@ -184,9 +184,9 @@ function MoyasarForm({ amount, description, planKey, billing, planName, accentCo
     } catch (err) {
       console.error("Moyasar init error:", err);
       setStatus("error");
-      setErrorMsg("حدث خطأ أثناء تهيئة بوابة الدفع.");
+      setErrorMsg(t("checkout.initError"));
     }
-  }, [status, amount, description, planKey, billing, planName, formId]);
+  }, [status, amount, description, planKey, billing, planName, formId, userId, t]);
 
   if (status === "error") {
     return (
@@ -200,22 +200,28 @@ function MoyasarForm({ amount, description, planKey, billing, planName, accentCo
     <>
       {status === "loading-sdk" && (
         <div style={{ padding: 32, textAlign: "center", color: R.muted, fontSize: 14 }}>
-          <div style={{ width: 32, height: 32, border: `3px solid ${R.border}`, borderTopColor: accentColor, borderRadius: "50%", margin: "0 auto 12px", animation: "spin 0.8s linear infinite" }} />
-          جاري تحميل بوابة الدفع...
+          <div style={{ width: 32, height: 32, border: `3px solid ${R.border}`, borderTopColor: accentColor, borderRadius: "50%", margin: "0 auto 12px", animation: "nx-spin 0.8s linear infinite" }} />
+          {t("checkout.loadingGateway")}
         </div>
       )}
 
       <div id={formId} />
 
       <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes nx-spin { to { transform: rotate(360deg); } }
+        @keyframes nx-fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes nx-pulse { 0%, 100% { box-shadow: 0 0 0 0 ${accentColor}40; } 50% { box-shadow: 0 0 0 8px ${accentColor}00; } }
         #${formId} input, #${formId} select {
-          font-family: 'Cairo', 'Inter', sans-serif !important;
+          font-family: inherit !important;
           border-radius: 10px !important;
           border: 1.5px solid ${R.border} !important;
           background: ${R.bg} !important;
           font-size: 14px !important;
           padding: 10px 12px !important;
+          transition: all 0.18s ease !important;
+        }
+        #${formId} input:hover, #${formId} select:hover {
+          border-color: ${accentColor}80 !important;
         }
         #${formId} input:focus, #${formId} select:focus {
           border-color: ${accentColor} !important;
@@ -225,21 +231,26 @@ function MoyasarForm({ amount, description, planKey, billing, planName, accentCo
         #${formId} button[type="submit"] {
           background: ${accentColor} !important;
           border-radius: 10px !important;
-          font-family: 'Cairo', 'Inter', sans-serif !important;
+          font-family: inherit !important;
           font-size: 15px !important;
           font-weight: 700 !important;
-          padding: 12px !important;
+          padding: 13px !important;
           width: 100% !important;
           border: none !important;
           color: white !important;
           cursor: pointer !important;
-          margin-top: 8px !important;
+          margin-top: 10px !important;
+          transition: transform 0.15s ease, opacity 0.15s ease, box-shadow 0.18s ease !important;
+          animation: nx-pulse 2.4s ease-in-out infinite !important;
         }
         #${formId} button[type="submit"]:hover {
-          opacity: 0.9 !important;
+          transform: translateY(-1px) !important;
+          opacity: 0.96 !important;
+          box-shadow: 0 8px 20px ${accentColor}50 !important;
         }
+        #${formId} button[type="submit"]:active { transform: translateY(0) !important; }
         #${formId} label {
-          font-family: 'Cairo', 'Inter', sans-serif !important;
+          font-family: inherit !important;
           font-size: 13px !important;
           font-weight: 600 !important;
           color: ${R.text} !important;
@@ -247,6 +258,11 @@ function MoyasarForm({ amount, description, planKey, billing, planName, accentCo
         #${formId} .mysr-method-tab {
           border-radius: 10px !important;
           border: 1.5px solid ${R.border} !important;
+          transition: all 0.15s ease !important;
+        }
+        #${formId} .mysr-method-tab:hover {
+          border-color: ${accentColor}80 !important;
+          background: ${accentLight}80 !important;
         }
         #${formId} .mysr-method-tab.active {
           border-color: ${accentColor} !important;
@@ -260,24 +276,34 @@ function MoyasarForm({ amount, description, planKey, billing, planName, accentCo
 /* ─── Main page ──────────────────────────────────────────────────────── */
 
 export default function Checkout() {
+  const { t, i18n } = useTranslation();
+  const isRtl = i18n.dir() === "rtl";
+  const { isLoaded, isSignedIn } = useUser();
+  const { userId } = useAuth();
   const { plan: planKey, billing } = getParams();
-  const planInfo = PLANS[planKey] ?? PLANS.pro;
+  const planInfo = PLANS[planKey] ?? PLANS["pro"];
   const isYearly = billing === "yearly";
   const amountSar = isYearly ? planInfo.yearlySar : planInfo.monthlySar;
   const amountHalala = amountSar * 100;
 
-  const accentColor = planKey === "unlimited" ? R.purple : R.orange;
-  const accentLight = planKey === "unlimited" ? R.purpleLight : R.orangeLight;
+  const accentColor = planInfo.color;
+  const accentLight = planInfo.light;
 
-  // Key changes whenever plan or billing changes → forces MoyasarForm to remount
-  const formKey = `${planKey}-${billing}`;
+  // Hover state for plan toggle micro-interactions
+  const [hoveredPlan, setHoveredPlan] = useState<string | null>(null);
+
+  // Force MoyasarForm full remount on plan/billing change
+  const formKey = `${planKey}-${billing}-${userId ?? "anon"}`;
+
+  const planLabel = t(`projectTypes.${planInfo.key}`, { defaultValue: planInfo.key === "pro" ? "Pro" : "Unlimited" });
+  const planName = `NexusOps ${planInfo.key === "pro" ? "Pro" : "Unlimited"}`;
 
   return (
-    <div style={{ minHeight: "100dvh", background: R.bg, fontFamily: "'Cairo', 'Inter', sans-serif", direction: "rtl" }}>
+    <div style={{ minHeight: "100dvh", background: R.bg, fontFamily: "'Cairo', 'Inter', sans-serif", direction: isRtl ? "rtl" : "ltr" }}>
 
       {/* Navbar */}
-      <header style={{ height: 60, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${R.border}`, background: R.bg }}>
-        <Link href={`${base}/`} style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
+      <header style={{ height: 60, padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${R.border}`, background: R.bg, position: "sticky", top: 0, zIndex: 10, backdropFilter: "blur(8px)" }}>
+        <Link href={`${base}/`} style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none", transition: "opacity 0.15s ease" }}>
           <div style={{ width: 28, height: 28, borderRadius: 7, background: R.orange, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
               <rect x="2" y="4" width="14" height="3.5" rx="1" fill="white" />
@@ -289,94 +315,127 @@ export default function Checkout() {
             Nexus<span style={{ color: R.orange }}>Ops</span>
           </span>
         </Link>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#10B981", fontWeight: 600 }}>
-          <Lock size={13} />
-          دفع آمن ومشفّر
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: R.green, fontWeight: 600, padding: "5px 10px", background: "#ECFDF5", borderRadius: 99 }}>
+          <Lock size={12} />
+          {t("checkout.secureBadge")}
         </div>
       </header>
 
       {/* Content */}
-      <div style={{ maxWidth: 980, margin: "0 auto", padding: "40px 24px", display: "grid", gridTemplateColumns: "1fr 380px", gap: 32, alignItems: "start" }}>
+      <div style={{ maxWidth: 980, margin: "0 auto", padding: "40px 24px", display: "grid", gridTemplateColumns: "1fr 380px", gap: 32, alignItems: "start", animation: "nx-fade-up 0.4s ease" }}>
 
         {/* Left — Order summary */}
         <div>
-          <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 600, color: R.text, marginBottom: 6 }}>
-            إتمام الاشتراك
+          <Link href={`${base}/pricing`} style={{ display: "inline-flex", alignItems: "center", gap: 6, color: R.muted, fontSize: 13, fontWeight: 500, textDecoration: "none", marginBottom: 16, transition: "color 0.15s ease" }}>
+            {isRtl ? <ArrowRight size={14} /> : <ArrowLeft size={14} />}
+            {t("nav.pricing")}
+          </Link>
+
+          <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 600, color: R.text, marginBottom: 8, lineHeight: 1.1 }}>
+            {t("checkout.title")}
           </h1>
-          <p style={{ fontSize: 14, color: R.muted, marginBottom: 32 }}>
-            {planInfo.nameAr} — اشتراك {isYearly ? "سنوي (وفّر شهرين)" : "شهري"} · يُلغى في أي وقت.
+          <p style={{ fontSize: 14, color: R.muted, marginBottom: 28 }}>
+            {planName} — {isYearly ? t("checkout.subtitleYearly") : t("checkout.subtitleMonthly")}
           </p>
 
           {/* Billing toggle */}
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 0, background: R.bgChip, borderRadius: 99, padding: 3, marginBottom: 24 }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 0, background: R.bgChip, borderRadius: 99, padding: 3, marginBottom: 18 }}>
             <Link
               href={`${base}/checkout?plan=${planKey}&billing=monthly`}
-              style={{ padding: "6px 16px", fontSize: 12, fontWeight: 600, borderRadius: 99, textDecoration: "none",
+              style={{ padding: "7px 18px", fontSize: 13, fontWeight: 600, borderRadius: 99, textDecoration: "none",
                 background: !isYearly ? R.bgCard : "transparent",
                 color: !isYearly ? R.text : R.muted,
-                boxShadow: !isYearly ? "0 1px 4px rgba(0,0,0,0.08)" : "none" }}
-            >شهري</Link>
+                boxShadow: !isYearly ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+                transition: "all 0.2s ease" }}
+            >{t("checkout.monthly")}</Link>
             <Link
               href={`${base}/checkout?plan=${planKey}&billing=yearly`}
-              style={{ padding: "6px 16px", fontSize: 12, fontWeight: 600, borderRadius: 99, textDecoration: "none",
+              style={{ padding: "7px 18px", fontSize: 13, fontWeight: 600, borderRadius: 99, textDecoration: "none",
                 background: isYearly ? R.bgCard : "transparent",
                 color: isYearly ? R.text : R.muted,
                 boxShadow: isYearly ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
-                display: "flex", alignItems: "center", gap: 5 }}
+                display: "flex", alignItems: "center", gap: 6,
+                transition: "all 0.2s ease" }}
             >
-              سنوي
-              <span style={{ fontSize: 9, background: "#10B981", color: "#fff", padding: "1px 6px", borderRadius: 99, fontWeight: 700 }}>وفّر 17%</span>
+              {t("checkout.yearly")}
+              <span style={{ fontSize: 9, background: R.green, color: "#fff", padding: "2px 7px", borderRadius: 99, fontWeight: 700, letterSpacing: 0.2 }}>{t("checkout.save17")}</span>
             </Link>
           </div>
 
           {/* Plan toggle */}
           <div style={{ display: "flex", gap: 10, marginBottom: 24 }}>
-            {Object.entries(PLANS).map(([key, p]) => (
-              <Link
-                key={key}
-                href={`${base}/checkout?plan=${key}&billing=${billing}`}
-                style={{ padding: "8px 16px", fontSize: 13, fontWeight: 600, borderRadius: 10, textDecoration: "none",
-                  background: planKey === key ? p.color : "transparent",
-                  color: planKey === key ? "#fff" : R.muted,
-                  border: `1.5px solid ${planKey === key ? p.color : R.border}`,
-                  transition: "all 0.15s" }}
-              >
-                {p.label}
-              </Link>
-            ))}
+            {Object.entries(PLANS).map(([key, p]) => {
+              const isActive = planKey === key;
+              const isHover = hoveredPlan === key;
+              return (
+                <Link
+                  key={key}
+                  href={`${base}/checkout?plan=${key}&billing=${billing}`}
+                  onMouseEnter={() => setHoveredPlan(key)}
+                  onMouseLeave={() => setHoveredPlan(null)}
+                  style={{
+                    padding: "9px 18px",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    borderRadius: 10,
+                    textDecoration: "none",
+                    background: isActive ? p.color : (isHover ? p.light : "transparent"),
+                    color: isActive ? "#fff" : R.text,
+                    border: `1.5px solid ${isActive ? p.color : (isHover ? p.color : R.border)}`,
+                    transform: isHover && !isActive ? "translateY(-1px)" : "translateY(0)",
+                    boxShadow: isActive ? `0 4px 14px ${p.color}50` : "none",
+                    transition: "all 0.18s ease",
+                  }}
+                >
+                  {key === "pro" ? "Pro" : "Unlimited"}
+                </Link>
+              );
+            })}
           </div>
 
           {/* Order box */}
-          <div style={{ background: R.bgCard, border: `2px solid ${accentColor}`, borderRadius: 16, padding: 24, marginBottom: 24, boxShadow: `0 0 0 4px ${accentLight}` }}>
+          <div style={{
+            background: R.bgCard,
+            border: `2px solid ${accentColor}`,
+            borderRadius: 16,
+            padding: 24,
+            marginBottom: 24,
+            boxShadow: `0 0 0 4px ${accentLight}, 0 4px 20px rgba(0,0,0,0.06)`,
+            transition: "all 0.3s ease",
+          }} key={`order-${planKey}-${billing}`}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 16, borderBottom: `1px solid ${R.border}` }}>
               <div>
-                <p style={{ fontWeight: 700, fontSize: 16, color: R.text }}>{planInfo.nameAr}</p>
-                <p style={{ fontSize: 13, color: R.muted, marginTop: 2 }}>اشتراك {isYearly ? "سنوي" : "شهري"}</p>
+                <p style={{ fontWeight: 700, fontSize: 17, color: R.text }}>{planName}</p>
+                <p style={{ fontSize: 13, color: R.muted, marginTop: 2 }}>
+                  {isYearly ? t("checkout.yearly") : t("checkout.monthly")} · {planLabel}
+                </p>
               </div>
-              <div style={{ textAlign: "left" }}>
-                <p style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 700, color: R.text }}>{amountSar} ر.س</p>
-                <p style={{ fontSize: 12, color: R.muted }}>/{isYearly ? "سنة" : "شهر"}</p>
+              <div style={{ textAlign: isRtl ? "left" : "right" }}>
+                <p style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 700, color: R.text, letterSpacing: -0.5 }}>
+                  {amountSar} <span style={{ fontSize: 14, fontWeight: 600 }}>SAR</span>
+                </p>
+                <p style={{ fontSize: 12, color: R.muted, marginTop: 2 }}>
+                  {isYearly ? t("checkout.perYear") : t("checkout.perMonth")}
+                </p>
               </div>
             </div>
 
             {isYearly && (
-              <div style={{ margin: "12px 0 0", padding: "8px 12px", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8, fontSize: 12, color: "#166534", fontWeight: 600 }}>
-                🎉 وفّرت {planInfo.monthlySar * 2} ر.س (شهرين مجاناً)
+              <div style={{ margin: "14px 0 0", padding: "10px 14px", background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 10, fontSize: 12, color: "#166534", fontWeight: 600, animation: "nx-fade-up 0.4s ease" }}>
+                {t("checkout.saved2Months", { amount: planInfo.monthlySar * 2 })}
               </div>
             )}
 
-            <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", background: accentLight, borderRadius: 8 }}>
-              <Coins size={14} color={accentColor} />
-              <span style={{ fontSize: 12, color: R.text, fontWeight: 600 }}>{planInfo.tokens}</span>
+            <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 7, padding: "9px 14px", background: accentLight, borderRadius: 10 }}>
+              <Coins size={15} color={accentColor} />
+              <span style={{ fontSize: 13, color: R.text, fontWeight: 600 }}>{planInfo.tokensKey}</span>
             </div>
 
-            <div style={{ paddingTop: 16, display: "flex", flexDirection: "column", gap: 9 }}>
-              {planInfo.features.map(f => (
-                <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: R.text }}>
-                  <span style={{ width: 17, height: 17, borderRadius: 99, background: accentColor, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <svg width="9" height="9" viewBox="0 0 12 12" fill="none">
-                      <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+            <div style={{ paddingTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+              {planInfo.featureKeys.map((f, idx) => (
+                <div key={f} style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13, color: R.text, animation: `nx-fade-up 0.3s ease ${0.05 * idx}s both` }}>
+                  <span style={{ width: 18, height: 18, borderRadius: 99, background: accentColor, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <CheckCircle2 size={10} color="white" strokeWidth={3} />
                   </span>
                   {f}
                 </div>
@@ -387,11 +446,11 @@ export default function Checkout() {
           {/* Trust badges */}
           <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
             {[
-              { icon: <Shield size={14} />, text: "مدفوعات مشفّرة بـ SSL" },
-              { icon: <Lock size={14} />, text: "لا نخزن بيانات بطاقتك" },
-              { icon: <ArrowRight size={14} />, text: "إلغاء فوري بدون رسوم" },
-            ].map(b => (
-              <div key={b.text} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: R.muted }}>
+              { icon: <Shield size={14} />, text: t("checkout.trustSsl") },
+              { icon: <Lock size={14} />, text: t("checkout.trustNoStore") },
+              { icon: <Sparkles size={14} />, text: t("checkout.trustCancel") },
+            ].map((b, idx) => (
+              <div key={idx} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: R.muted }}>
                 {b.icon} {b.text}
               </div>
             ))}
@@ -401,25 +460,43 @@ export default function Checkout() {
         {/* Right — Payment form */}
         <div>
           <div style={{ background: R.bgCard, border: `1px solid ${R.border}`, borderRadius: 16, padding: 24, boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
-            <p style={{ fontSize: 14, fontWeight: 600, color: R.text, marginBottom: 16 }}>بيانات الدفع</p>
+            <p style={{ fontSize: 14, fontWeight: 700, color: R.text, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+              <Lock size={14} color={accentColor} />
+              {t("checkout.paymentDetails")}
+            </p>
 
-            {/* key forces full remount when plan or billing changes */}
-            <MoyasarForm
-              key={formKey}
-              amount={amountHalala}
-              description={`${planInfo.nameAr} — اشتراك ${isYearly ? "سنوي" : "شهري"}`}
-              planKey={planKey}
-              billing={billing}
-              planName={planInfo.nameAr}
-              accentColor={accentColor}
-              accentLight={accentLight}
-            />
+            {!isLoaded ? (
+              <div style={{ padding: 32, textAlign: "center", color: R.muted, fontSize: 14 }}>
+                <div style={{ width: 28, height: 28, border: `3px solid ${R.border}`, borderTopColor: accentColor, borderRadius: "50%", margin: "0 auto 10px", animation: "nx-spin 0.8s linear infinite" }} />
+              </div>
+            ) : !isSignedIn || !userId ? (
+              <div style={{ padding: 16, background: R.orangeLight, border: `1px solid ${R.orange}40`, borderRadius: 10, fontSize: 13, color: R.text, textAlign: "center" }}>
+                <p style={{ marginBottom: 12, lineHeight: 1.6 }}>{t("checkout.loginRequired")}</p>
+                <SignInButton mode="modal" forceRedirectUrl={window.location.pathname + window.location.search}>
+                  <button style={{ padding: "10px 24px", background: R.orange, color: "white", border: "none", borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
+                    {t("checkout.signInBtn")}
+                  </button>
+                </SignInButton>
+              </div>
+            ) : (
+              <MoyasarForm
+                key={formKey}
+                amount={amountHalala}
+                description={`${planName} — ${isYearly ? t("checkout.yearly") : t("checkout.monthly")}`}
+                planKey={planKey}
+                billing={billing}
+                planName={planName}
+                accentColor={accentColor}
+                accentLight={accentLight}
+                userId={userId}
+              />
+            )}
 
             <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${R.border}` }}>
-              <p style={{ fontSize: 11, color: R.muted, marginBottom: 10, textAlign: "center" }}>وسائل الدفع المقبولة</p>
-              <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-                {["مدى", "Visa", "Mastercard", "Apple Pay", "STC Pay"].map(m => (
-                  <span key={m} style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", background: R.bgChip, border: `1px solid ${R.border}`, borderRadius: 6, color: R.text }}>
+              <p style={{ fontSize: 11, color: R.muted, marginBottom: 10, textAlign: "center" }}>{t("checkout.acceptedMethods")}</p>
+              <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
+                {["Mada", "Visa", "Mastercard", "Apple Pay", "STC Pay"].map(m => (
+                  <span key={m} style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", background: R.bgChip, border: `1px solid ${R.border}`, borderRadius: 6, color: R.text }}>
                     {m}
                   </span>
                 ))}
@@ -429,7 +506,7 @@ export default function Checkout() {
 
           <div style={{ textAlign: "center", marginTop: 14 }}>
             <a href="https://moyasar.com" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: R.muted, textDecoration: "none" }}>
-              مدعوم بـ <span style={{ fontWeight: 700 }}>ميسر</span>
+              {t("checkout.poweredBy")} <span style={{ fontWeight: 700 }}>Moyasar</span>
             </a>
           </div>
         </div>

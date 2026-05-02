@@ -100,5 +100,41 @@
     "newConversation": "New conversation",
     "messagePlaceholder": "Ask Agent-4 anything...",
     "send": "Send"
+  },
+  "checkout": {
+    "title": "Complete your subscription",
+    "subtitleMonthly": "monthly subscription · cancel anytime.",
+    "subtitleYearly": "yearly subscription (2 months free) · cancel anytime.",
+    "monthly": "Monthly",
+    "yearly": "Yearly",
+    "save17": "Save 17%",
+    "perMonth": "/mo",
+    "perYear": "/yr",
+    "saved2Months": "🎉 You saved {{amount}} SAR (2 months free)",
+    "paymentDetails": "Payment details",
+    "loadingGateway": "Loading payment gateway...",
+    "loadFailed": "Could not load payment gateway. Check your internet connection.",
+    "missingKey": "Moyasar key not configured — please verify project settings.",
+    "initError": "Error initializing payment gateway.",
+    "secureBadge": "Secure encrypted payment",
+    "trustSsl": "SSL-encrypted payments",
+    "trustNoStore": "We never store your card details",
+    "trustCancel": "Cancel anytime, no fees",
+    "acceptedMethods": "Accepted payment methods",
+    "poweredBy": "Powered by",
+    "loginRequired": "Please sign in to continue with checkout.",
+    "signInBtn": "Sign in"
+  },
+  "paymentSuccess": {
+    "loadingTitle": "Activating your subscription...",
+    "loadingSubtitle": "Verifying payment and activating your account.",
+    "successTitle": "Subscription activated!",
+    "successMsg": "We received your payment and activated your subscription successfully.",
+    "goDashboard": "Go to dashboard",
+    "failedTitle": "Activation issue",
+    "failedDefault": "Could not verify payment status. Please contact support.",
+    "failedFromMoyasar": "Payment failed. Please try again.",
+    "retry": "Retry",
+    "contactSupport": "Contact support"
   }
 }
