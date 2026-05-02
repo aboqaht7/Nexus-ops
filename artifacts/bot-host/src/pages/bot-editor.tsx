@@ -42,6 +42,8 @@ import {
   Wifi,
   WifiOff,
   FileCode2,
+  Monitor,
+  ExternalLink,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -70,7 +72,9 @@ const E = {
 
 interface EnvRow { key: string; value: string; visible: boolean; }
 interface LogLine { timestamp: string; level: "info" | "error"; message: string; }
-type ActiveTab = "console" | "terminal" | "secrets" | "packages";
+type ActiveTab = "console" | "terminal" | "secrets" | "packages" | "preview";
+
+const WEB_PROJECT_TYPES = ["website", "game", "web-app"];
 
 const STATUS_AR: Record<BotStatus, string> = {
   running: "يعمل",
@@ -218,7 +222,12 @@ export default function BotEditor() {
     );
   }
 
+  const projectType = (bot as { projectType?: string }).projectType ?? "discord-bot";
+  const isWebProject = WEB_PROJECT_TYPES.includes(projectType);
+  const previewUrl = `${base}/api/preview/${bot.id}/?t=${Date.now()}`;
+
   const TABS: { id: ActiveTab; label: string; icon: React.ReactNode }[] = [
+    ...(isWebProject ? [{ id: "preview" as ActiveTab, label: "معاينة", icon: <Monitor size={13} /> }] : []),
     { id: "console",  label: "وحدة التحكم", icon: <Terminal size={13} /> },
     { id: "terminal", label: "الطرفية",       icon: <Terminal size={13} /> },
     { id: "secrets",  label: "الأسرار",       icon: <KeyRound size={13} /> },
@@ -534,6 +543,45 @@ export default function BotEditor() {
           {activeTab === "packages" && bot && (
             <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
               <PackagesPanel botId={id!} language={bot.language as "javascript" | "python"} />
+            </div>
+          )}
+
+          {/* ── معاينة (web/game/web-app only) ──────────── */}
+          {activeTab === "preview" && isWebProject && (
+            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", background: "#fff" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 12px", borderBottom: `1px solid ${E.border}`, background: E.bgHeader, flexShrink: 0 }}>
+                <span style={{ fontSize: 11, color: E.muted, fontFamily: "'JetBrains Mono', monospace" }}>
+                  /api/preview/{bot.id}/
+                </span>
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button
+                    onClick={() => {
+                      const iframe = document.getElementById("preview-iframe") as HTMLIFrameElement | null;
+                      if (iframe) iframe.src = `${base}/api/preview/${bot.id}/?t=${Date.now()}`;
+                    }}
+                    title="إعادة تحميل"
+                    style={{ background: "transparent", border: `1px solid ${E.border}`, color: E.muted, borderRadius: 6, padding: "3px 8px", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                  >
+                    <RotateCw size={11} />
+                  </button>
+                  <a
+                    href={previewUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="فتح في علامة تبويب جديدة"
+                    style={{ background: "transparent", border: `1px solid ${E.border}`, color: E.muted, borderRadius: 6, padding: "3px 8px", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, textDecoration: "none" }}
+                  >
+                    <ExternalLink size={11} />
+                  </a>
+                </div>
+              </div>
+              <iframe
+                id="preview-iframe"
+                src={previewUrl}
+                title="Project Preview"
+                style={{ flex: 1, border: "none", background: "#fff", width: "100%" }}
+                sandbox="allow-scripts allow-forms allow-same-origin allow-modals allow-popups"
+              />
             </div>
           )}
         </div>

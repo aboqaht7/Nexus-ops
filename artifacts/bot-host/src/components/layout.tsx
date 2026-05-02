@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { Link } from "wouter";
+import { useTranslation } from "react-i18next";
 import { Activity, Sparkles, LogOut, Crown, Settings } from "lucide-react";
 import { useClerk, useUser } from "@clerk/react";
 import {
@@ -11,12 +12,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { LanguageSwitcher } from "@/components/language-switcher";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 function UserMenu() {
   const { signOut } = useClerk();
   const { user } = useUser();
+  const { t } = useTranslation();
 
   if (!user) return null;
 
@@ -41,7 +44,7 @@ function UserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="flex flex-col gap-0.5">
-          <span className="font-semibold text-sm truncate">{user.fullName ?? "المستخدم"}</span>
+          <span className="font-semibold text-sm truncate">{user.fullName ?? t("common.user")}</span>
           <span className="text-xs text-muted-foreground font-normal truncate">
             {user.emailAddresses[0]?.emailAddress}
           </span>
@@ -50,13 +53,13 @@ function UserMenu() {
         <DropdownMenuItem asChild>
           <Link href={`${basePath}/settings`} className="flex items-center gap-2 cursor-pointer">
             <Settings className="w-4 h-4" />
-            الإعدادات
+            {t("nav.settings")}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href={`${basePath}/pricing`} className="flex items-center gap-2 cursor-pointer text-primary font-medium">
             <Crown className="w-4 h-4" />
-            ترقية الخطة
+            {t("nav.upgrade")}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
@@ -65,7 +68,7 @@ function UserMenu() {
           className="text-destructive focus:text-destructive cursor-pointer"
         >
           <LogOut className="w-4 h-4 ml-2" />
-          تسجيل الخروج
+          {t("nav.logout")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -73,6 +76,8 @@ function UserMenu() {
 }
 
 export function Layout({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
+
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background text-foreground font-sans">
       <header className="sticky top-0 z-40 w-full border-b border-border bg-background/90 backdrop-blur-md">
@@ -98,19 +103,16 @@ export function Layout({ children }: { children: ReactNode }) {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
               <Activity className="w-4 h-4" />
-              <span className="hidden sm:block">لوحة التحكم</span>
+              <span className="hidden sm:block">{t("nav.dashboard")}</span>
             </Link>
             <Link
               href={`${basePath}/agent`}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
               <Sparkles className="w-4 h-4" />
-              <span className="hidden sm:block">Agent-4</span>
+              <span className="hidden sm:block">{t("nav.agent")}</span>
             </Link>
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold mx-1">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="hidden sm:block">متصل</span>
-            </div>
+            <LanguageSwitcher />
             <UserMenu />
           </nav>
         </div>

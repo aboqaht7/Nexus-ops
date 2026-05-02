@@ -1,1 +1,15 @@
-[]
+[
+  {
+    "id": "0d77efee-7a31-4fce-a275-dcacc7e86c0a",
+    "name": "test-website",
+    "filename": "index.html",
+    "language": "javascript",
+    "status": "stopped",
+    "autoRestart": true,
+    "restartCount": 0,
+    "createdAt": "2026-05-02T19:16:29.563Z",
+    "startedAt": null,
+    "uptimeSeconds": null,
+    "projectType": "website"
+  }
+]

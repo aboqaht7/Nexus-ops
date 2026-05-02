@@ -2,7 +2,7 @@
 
 ## Overview
 
-Discord Bot Hosting panel — a full-stack monorepo for running Discord bots 24/7.
+NexusOps — a comprehensive "build anything" platform like Replit. Build & host Discord bots, websites, HTML5 games, web apps, API servers, and Python scripts from the browser, powered by Agent-4 (Claude Sonnet 4.5). Cream/orange brand (#FAF7F2 / #F26207). 8-language i18n (AR default RTL, EN/ES/FR/DE/ZH/JA/RU LTR). Moyasar payments (SAR).
 
 ## Stack
 
@@ -22,14 +22,44 @@ Discord Bot Hosting panel — a full-stack monorepo for running Discord bots 24/
 - **bot-host** (`/`) — React + Vite dashboard for managing bots (dark themed)
 - **api-server** (`/api`) — Express 5 REST API with bot process management
 
-## Bot Manager
+## Project Manager (formerly "Bot Manager")
 
-- Bot files stored in `data/bot-files/`
-- Bot registry persisted in `data/bots.json`
-- Bot env vars stored in `data/bot-envs/{id}.json` (injected into process on start)
-- Supports JavaScript (node) and Python (python3) bots
-- Auto-restart on crash with exponential backoff (max 30s delay)
-- SSE log streaming via `subscribeToLogs()` pub/sub; 500-entry ring buffer
+- Files stored in `data/bot-files/{id}/`
+- Registry persisted in `data/bots.json`; env vars in `data/bot-envs/{id}.json`
+- **Project types** (`ProjectType` union, default `discord-bot`):
+  - `discord-bot` — discord.js v14 / discord.py (long-running process)
+  - `website` — static HTML/CSS/JS with iframe live preview
+  - `game` — HTML5 Canvas games with iframe live preview
+  - `web-app` — React via UMD + Tailwind CDN with iframe live preview
+  - `api-server` — Express (JS) or FastAPI (Py)
+  - `python-script` — automation scripts
+- `isWebProject(type)` helper — true for website/game/web-app
+- Web projects auto-create `index.html` if missing on registration
+- JS/Python long-running types: auto-restart on crash, SSE log streaming (500-entry ring buffer)
+- `POST /api/bots/create-from-code` accepts `{name, projectType, language?, code?}`; server fills starter template per type if `code` empty
+
+## Static Preview (web/game/web-app)
+
+- `GET /api/preview/:botId/*` serves bot's directory as static site
+- MIME map for HTML/CSS/JS/SVG/PNG/etc; default → `index.html`
+- Path-traversal hardened: `path.resolve` + prefix check on `dir + sep`; URL-encoded `..` blocked with 403
+- Returns 400 for non-web project types
+
+## i18n (8 languages)
+
+- `react-i18next` + `i18next-browser-languagedetector`
+- Locale files in `src/i18n/locales/{ar,en,es,fr,de,zh,ja,ru}.json`
+- `LanguageSwitcher` component (globe icon dropdown with flags) in layout + home navbar
+- Auto-sets `<html dir="rtl">` for AR, `dir="ltr"` for others
+- Persisted to `localStorage` key `nexusops-lang`
+- Translation namespaces: nav, common, home, projectTypes, dashboard, createProject, pricing, agent
+
+## Agent-4 (generic, multi-type)
+
+- `routes/anthropic/index.ts` — `BASE_SYSTEM_PROMPT` + `PROJECT_TYPE_PROMPTS` map (6 types)
+- `buildSystemPrompt(projectType)` composes per-conversation prompt based on linked bot's type
+- Detects user language; replies in same language (Arabic, English, etc.)
+- Streams via SSE; existing tools (file r/w, terminal, packages) work generically across all types
 
 ## Authentication (Clerk)
 
@@ -44,10 +74,11 @@ Discord Bot Hosting panel — a full-stack monorepo for running Discord bots 24/
 - Protected routes: unauthorized → `<RedirectToSignIn />`
 - `bots.ts` and `bots-import-export.ts` pass userId when registering bots
 
-## Replit-like IDE Features (per bot)
+## Replit-like IDE Features (per project)
 
 - `/bots/:id/editor` — full-screen Monaco editor page
-  - Monaco code editor (left, syntax-highlighted JS/Python)
+  - Monaco code editor (left)
+  - **Preview tab** (web/game/web-app only): live iframe pointing to `/api/preview/:botId/`, with reload + open-in-new-tab; sandboxed `allow-scripts allow-forms allow-same-origin allow-modals allow-popups`
   - **Console tab**: SSE real-time log stream via `GET /api/bots/:id/logs/stream`
   - **Terminal tab**: xterm.js + node-pty WebSocket terminal via `wss://.../api/bots/:id/terminal`
   - **Secrets tab**: add/edit/remove KEY=VALUE env vars with show/hide toggle
@@ -78,11 +109,21 @@ Discord Bot Hosting panel — a full-stack monorepo for running Discord bots 24/
 - Download: `GET /api/bots/:id/download` — download bot file
 - **Templates**: 6 pre-built templates (Ping/Slash/Moderation/Welcome in JS, Ping/Logger in Python) in Deploy dialog
 
-## Landing Page
+## Landing Page (`/`)
 
-- Public landing page at `/` (visible when signed out)
-- Hero section, features grid (6), how-it-works (3 steps), included features list
-- Sign in/Sign up CTAs; auto-redirects signed-in users to `/dashboard`
+- Public landing page (visible when signed out), fully internationalized
+- Hero: "Build bots, games, websites and apps with a single prompt"
+- Project types grid (6 cards: Discord Bot / Website / Game / Web App / API Server / Python Script)
+- Localized example prompts per language
+- LanguageSwitcher in navbar; RTL layout flips automatically for AR
+
+## Dashboard (`/dashboard`)
+
+- `CreateProjectDialog` (replaces old UploadBotDialog) — 2-step flow:
+  1. Pick project type (6-card grid with icons)
+  2. Enter project name + (for bots/api) pick JS/Python; create → auto-redirect to editor
+- `BotCard` shows project-type icon + colored badge + filename
+- Web projects get a Preview (👁) button on the card opening `/api/preview/:botId/` in a new tab
 
 ## Key Commands
 

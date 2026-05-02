@@ -7,6 +7,7 @@ import agentRouter from "./agent/index.js";
 import botsEditorRouter from "./bots-editor.js";
 import packagesRouter from "./packages.js";
 import subscriptionsRouter from "./subscriptions.js";
+import previewRouter from "./preview.js";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(agentRouter);
 router.use(botsEditorRouter);
 router.use(packagesRouter);
 router.use(subscriptionsRouter);
+router.use(previewRouter);
 
 export default router;

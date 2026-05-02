@@ -7,6 +7,7 @@
  */
 import type { BotLanguage } from "./botLanguage";
 import type { BotStatus } from "./botStatus";
+import type { ProjectType } from "./projectType";
 
 export interface Bot {
   id: string;
@@ -19,4 +20,5 @@ export interface Bot {
   createdAt: Date;
   startedAt?: Date | null;
   uptimeSeconds?: number | null;
+  projectType?: ProjectType;
 }

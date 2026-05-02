@@ -1,0 +1,104 @@
+{
+  "nav": {
+    "dashboard": "ダッシュボード",
+    "agent": "Agent-4",
+    "pricing": "料金",
+    "signIn": "ログイン",
+    "signUp": "新規登録",
+    "settings": "設定",
+    "upgrade": "プランをアップグレード",
+    "logout": "ログアウト",
+    "language": "言語"
+  },
+  "common": {
+    "loading": "読み込み中...",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "delete": "削除",
+    "create": "作成",
+    "edit": "編集",
+    "back": "戻る",
+    "next": "次へ",
+    "search": "検索",
+    "comingSoon": "近日公開",
+    "free": "無料",
+    "user": "ユーザー"
+  },
+  "home": {
+    "heroTag": "あらゆるものを構築できるオールインワンプラットフォーム",
+    "heroTitle": "ボット、ゲーム、サイト、アプリを作成",
+    "heroTitleAccent": "プロンプト1つで",
+    "heroSubtitle": "Agent-4 が何でも構築 — Discord ボット、HTML5 ゲーム、ウェブサイト、API、Python スクリプト — すべて稼働し 24/7 でホスティング。",
+    "ctaStart": "無料で始める",
+    "ctaPricing": "料金",
+    "promptPlaceholder": "作りたいものを説明してください...",
+    "examplesTitle": "例を試す:",
+    "projectTypesTitle": "何でも構築",
+    "projectTypesSubtitle": "プロジェクトタイプですべてが決まる — Agent-4 は何をすべきか正確に知っている",
+    "featuresTitle": "必要なすべてが1つのプラットフォームに",
+    "pricingTitle": "シンプルで透明な料金",
+    "footerRights": "© 2026 NexusOps。全著作権所有。"
+  },
+  "projectTypes": {
+    "discord-bot": "Discord ボット",
+    "discord-bot.desc": "discord.js または discord.py を使った本格的なボット",
+    "website": "ウェブサイト",
+    "website.desc": "ライブプレビュー付きの静的 HTML/CSS/JS ページ",
+    "game": "ゲーム",
+    "game.desc": "ブラウザで動く HTML5 Canvas ゲーム",
+    "web-app": "ウェブアプリ",
+    "web-app.desc": "完全にインタラクティブな React アプリ",
+    "api-server": "API サーバー",
+    "api-server.desc": "REST エンドポイント付き Express または FastAPI",
+    "python-script": "Python スクリプト",
+    "python-script.desc": "自動化、スクレイピング、データ処理"
+  },
+  "dashboard": {
+    "title": "プロジェクト概要",
+    "subtitle": "すべてのプロジェクトを1か所で管理・監視。",
+    "newProject": "新規プロジェクト",
+    "stats": {
+      "total": "合計",
+      "running": "稼働中",
+      "stopped": "停止中",
+      "crashed": "クラッシュ",
+      "restarts": "再起動回数"
+    },
+    "empty": {
+      "title": "まだプロジェクトがありません",
+      "subtitle": "最初のプロジェクトを作成 — ボット、サイト、ゲーム、アプリ。"
+    },
+    "planBanner": {
+      "expires": "期限",
+      "upgradeBtn": "アップグレード"
+    }
+  },
+  "createProject": {
+    "title": "新規プロジェクト",
+    "subtitle": "プロジェクトタイプを選んですぐに構築を開始",
+    "selectType": "タイプを選択",
+    "namePlaceholder": "プロジェクト名",
+    "createBtn": "プロジェクトを作成",
+    "useTemplate": "テンプレートを使用",
+    "fromScratch": "ゼロから",
+    "withAgent": "Agent-4 で始める"
+  },
+  "pricing": {
+    "title": "シンプルで透明な料金",
+    "subtitle": "あなたに合ったプランを選択。いつでも変更・キャンセル可能。",
+    "monthly": "月額",
+    "yearly": "年額",
+    "save": "20% 節約",
+    "perMonth": "/月",
+    "perYear": "/年",
+    "currentPlan": "現在のプラン",
+    "subscribe": "今すぐ登録"
+  },
+  "agent": {
+    "title": "Agent-4",
+    "subtitle": "プロジェクトを構築・修正する真の自律型 AI エージェント",
+    "newConversation": "新しい会話",
+    "messagePlaceholder": "Agent-4 に何でも聞いてください...",
+    "send": "送信"
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "nav": {
+    "dashboard": "Panel",
+    "agent": "Agent-4",
+    "pricing": "Precios",
+    "signIn": "Iniciar sesión",
+    "signUp": "Registrarse",
+    "settings": "Ajustes",
+    "upgrade": "Mejorar plan",
+    "logout": "Cerrar sesión",
+    "language": "Idioma"
+  },
+  "common": {
+    "loading": "Cargando...",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "create": "Crear",
+    "edit": "Editar",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "search": "Buscar",
+    "comingSoon": "Próximamente",
+    "free": "Gratis",
+    "user": "Usuario"
+  },
+  "home": {
+    "heroTag": "Plataforma todo-en-uno para todo lo que construyes",
+    "heroTitle": "Crea bots, juegos, sitios y apps",
+    "heroTitleAccent": "con un solo prompt",
+    "heroSubtitle": "Agent-4 construye cualquier cosa por ti — bots de Discord, juegos HTML5, sitios web, APIs, scripts de Python — todo funcionando y alojado 24/7.",
+    "ctaStart": "Empezar gratis",
+    "ctaPricing": "Precios",
+    "promptPlaceholder": "Describe lo que quieres construir...",
+    "examplesTitle": "Prueba ejemplos:",
+    "projectTypesTitle": "Construye cualquier cosa",
+    "projectTypesSubtitle": "El tipo de proyecto lo configura todo — Agent-4 sabe exactamente qué hacer",
+    "featuresTitle": "Todo lo que necesitas en una plataforma",
+    "pricingTitle": "Precios simples y transparentes",
+    "footerRights": "© 2026 NexusOps. Todos los derechos reservados."
+  },
+  "projectTypes": {
+    "discord-bot": "Bot de Discord",
+    "discord-bot.desc": "Bots profesionales con discord.js o discord.py",
+    "website": "Sitio web",
+    "website.desc": "Páginas HTML/CSS/JS estáticas con vista previa en vivo",
+    "game": "Juego",
+    "game.desc": "Juegos HTML5 Canvas que corren en el navegador",
+    "web-app": "Aplicación web",
+    "web-app.desc": "Aplicaciones React interactivas completas",
+    "api-server": "Servidor API",
+    "api-server.desc": "Express o FastAPI con endpoints REST",
+    "python-script": "Script de Python",
+    "python-script.desc": "Automatización, scraping, procesamiento de datos"
+  },
+  "dashboard": {
+    "title": "Resumen de tus proyectos",
+    "subtitle": "Administra y monitorea todos tus proyectos desde un solo lugar.",
+    "newProject": "Nuevo proyecto",
+    "stats": {
+      "total": "Total",
+      "running": "Activos",
+      "stopped": "Detenidos",
+      "crashed": "Fallidos",
+      "restarts": "Reinicios"
+    },
+    "empty": {
+      "title": "Aún no hay proyectos",
+      "subtitle": "Comienza creando tu primer proyecto — bot, sitio, juego o app."
+    },
+    "planBanner": {
+      "expires": "Caduca",
+      "upgradeBtn": "Mejorar"
+    }
+  },
+  "createProject": {
+    "title": "Nuevo proyecto",
+    "subtitle": "Elige un tipo de proyecto y empieza a construir de inmediato",
+    "selectType": "Selecciona el tipo",
+    "namePlaceholder": "Nombre del proyecto",
+    "createBtn": "Crear proyecto",
+    "useTemplate": "Usar una plantilla",
+    "fromScratch": "Desde cero",
+    "withAgent": "Empezar con Agent-4"
+  },
+  "pricing": {
+    "title": "Precios simples y transparentes",
+    "subtitle": "Elige el plan que te convenga. Cambia o cancela cuando quieras.",
+    "monthly": "Mensual",
+    "yearly": "Anual",
+    "save": "Ahorra 20%",
+    "perMonth": "/mes",
+    "perYear": "/año",
+    "currentPlan": "Tu plan actual",
+    "subscribe": "Suscribirse"
+  },
+  "agent": {
+    "title": "Agent-4",
+    "subtitle": "Un verdadero agente de IA autónomo que construye y arregla tus proyectos",
+    "newConversation": "Nueva conversación",
+    "messagePlaceholder": "Pídele cualquier cosa a Agent-4...",
+    "send": "Enviar"
+  }
+}

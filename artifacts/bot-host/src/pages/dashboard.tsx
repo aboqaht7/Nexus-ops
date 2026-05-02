@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useListBots, useGetBotsStats, getListBotsQueryKey, getGetBotsStatsQueryKey } from "@workspace/api-client-react";
-import { UploadBotDialog } from "@/components/upload-bot-dialog";
+import { CreateProjectDialog } from "@/components/create-project-dialog";
 import { BotCard } from "@/components/bot-card";
 import { Layout } from "@/components/layout";
 import { Activity, Server, XCircle, RefreshCw, Coins, Crown } from "lucide-react";
@@ -20,7 +21,7 @@ interface SubscriptionInfo {
 }
 
 const PLAN_LABEL: Record<string, string> = {
-  free: "مجاني",
+  free: "Free",
   pro: "Pro",
   unlimited: "Unlimited",
 };
@@ -32,6 +33,8 @@ const PLAN_COLOR: Record<string, string> = {
 };
 
 export default function Dashboard() {
+  const { t, i18n } = useTranslation();
+
   const { data: bots, isLoading: isLoadingBots } = useListBots({
     query: { refetchInterval: 3000, queryKey: getListBotsQueryKey() }
   });
@@ -50,7 +53,7 @@ export default function Dashboard() {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (resp.ok) setSub(await resp.json() as SubscriptionInfo);
-      } catch {}
+      } catch { /* ignore */ }
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -61,14 +64,18 @@ export default function Dashboard() {
   const botsPercent = maxBots === -1 ? 0 : Math.min((botUsage / maxBots) * 100, 100);
   const isAtLimit = maxBots !== -1 && botUsage >= maxBots;
 
+  const dateLocaleCode = i18n.language === "ar" ? "ar-SA" : i18n.language;
+
   return (
     <Layout>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "'Fraunces', serif" }}>نظرة عامة على بوتاتك</h1>
-          <p className="text-muted-foreground mt-1 text-sm">إدارة ومراقبة بوتات Discord الخاصة بك.</p>
+          <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "'Fraunces', serif" }}>
+            {t("dashboard.title")}
+          </h1>
+          <p className="text-muted-foreground mt-1 text-sm">{t("dashboard.subtitle")}</p>
         </div>
-        <UploadBotDialog />
+        <CreateProjectDialog />
       </div>
 
       {/* Plan banner */}
@@ -89,21 +96,20 @@ export default function Dashboard() {
             <Crown size={18} color={planColor} />
             <div>
               <span style={{ fontWeight: 700, fontSize: 14, color: planColor }}>
-                خطة {PLAN_LABEL[sub.plan]}
+                {PLAN_LABEL[sub.plan]}
               </span>
               {sub.expiresAt && (
-                <span style={{ fontSize: 12, color: "#6B6B6B", marginRight: 8 }}>
-                  · تنتهي {new Date(sub.expiresAt).toLocaleDateString("ar-SA")}
+                <span style={{ fontSize: 12, color: "#6B6B6B", marginInlineStart: 8 }}>
+                  · {t("dashboard.planBanner.expires")} {new Date(sub.expiresAt).toLocaleDateString(dateLocaleCode)}
                 </span>
               )}
             </div>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
-            {/* Bots usage bar */}
             <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 140 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#6B6B6B", fontWeight: 600 }}>
-                <span>البوتات</span>
+                <span>{t("dashboard.stats.total")}</span>
                 <span style={{ color: isAtLimit ? "#EF4444" : "#0D0D0D" }}>
                   {botUsage} / {maxBots === -1 ? "∞" : maxBots}
                 </span>
@@ -119,11 +125,10 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Tokens */}
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#6B6B6B" }}>
               <Coins size={13} color={planColor} />
               <span style={{ fontWeight: 600 }}>
-                {sub.limits.tokensPerMonth === -1 ? "توكنات غير محدودة" : `${sub.limits.tokensPerMonth} توكن/شهر`}
+                {sub.limits.tokensPerMonth === -1 ? "∞" : sub.limits.tokensPerMonth} tokens
               </span>
             </div>
 
@@ -133,70 +138,22 @@ export default function Dashboard() {
                 background: "#F26207", borderRadius: 8, padding: "5px 14px",
                 textDecoration: "none",
               }}>
-                ترقية الخطة ↑
+                {t("dashboard.planBanner.upgradeBtn")} ↑
               </Link>
             )}
           </div>
         </div>
       )}
 
-      {/* Limit warning */}
-      {isAtLimit && (
-        <div style={{
-          background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12,
-          padding: "12px 16px", marginBottom: 20,
-          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-        }}>
-          <p style={{ fontSize: 13, color: "#DC2626", fontWeight: 600 }}>
-            ⚠️ وصلت للحد الأقصى من البوتات في خطتك. رقّ خطتك لإضافة المزيد.
-          </p>
-          <Link href={`${base}/pricing`} style={{
-            fontSize: 12, fontWeight: 700, color: "#fff",
-            background: "#EF4444", borderRadius: 8, padding: "5px 14px",
-            textDecoration: "none", whiteSpace: "nowrap",
-          }}>
-            ترقية الآن
-          </Link>
-        </div>
-      )}
-
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-        <StatCard
-          title="إجمالي البوتات"
-          value={stats?.total}
-          icon={<Server className="w-4 h-4 text-primary" />}
-          isLoading={isLoadingStats}
-        />
-        <StatCard
-          title="يعمل الآن"
-          value={stats?.running}
-          icon={<Activity className="w-4 h-4 text-emerald-500" />}
-          isLoading={isLoadingStats}
-          accent="emerald"
-        />
-        <StatCard
-          title="تعطّل"
-          value={stats?.crashed}
-          icon={<XCircle className="w-4 h-4 text-red-500" />}
-          isLoading={isLoadingStats}
-          accent="red"
-        />
-        <StatCard
-          title="إعادات التشغيل"
-          value={stats?.totalRestarts}
-          icon={<RefreshCw className="w-4 h-4 text-amber-500" />}
-          isLoading={isLoadingStats}
-          accent="amber"
-        />
+        <StatCard title={t("dashboard.stats.total")} value={stats?.total} icon={<Server className="w-4 h-4 text-primary" />} isLoading={isLoadingStats} />
+        <StatCard title={t("dashboard.stats.running")} value={stats?.running} icon={<Activity className="w-4 h-4 text-emerald-500" />} isLoading={isLoadingStats} />
+        <StatCard title={t("dashboard.stats.crashed")} value={stats?.crashed} icon={<XCircle className="w-4 h-4 text-red-500" />} isLoading={isLoadingStats} />
+        <StatCard title={t("dashboard.stats.restarts")} value={stats?.totalRestarts} icon={<RefreshCw className="w-4 h-4 text-amber-500" />} isLoading={isLoadingStats} />
       </div>
 
       {/* Bots list */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-base font-semibold text-foreground">البوتات النشطة</h2>
-        <div className="h-px flex-1 bg-border mx-4" />
-      </div>
-
       {isLoadingBots ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map(i => (
@@ -220,11 +177,11 @@ export default function Dashboard() {
               <circle cx="13.5" cy="5.75" r="1.25" fill="#FFD580" />
             </svg>
           </div>
-          <h3 className="text-base font-semibold text-foreground mb-1">لا توجد بوتات مُنشرة</h3>
+          <h3 className="text-base font-semibold text-foreground mb-1">{t("dashboard.empty.title")}</h3>
           <p className="text-muted-foreground text-sm max-w-md mx-auto mb-6">
-            لم تقم بنشر أي بوتات بعد. قم بتحميل ملف JavaScript أو Python للبدء.
+            {t("dashboard.empty.subtitle")}
           </p>
-          <UploadBotDialog />
+          <CreateProjectDialog />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -237,14 +194,8 @@ export default function Dashboard() {
   );
 }
 
-function StatCard({
-  title, value, icon, isLoading, accent
-}: {
-  title: string;
-  value?: number;
-  icon: React.ReactNode;
-  isLoading: boolean;
-  accent?: "emerald" | "red" | "amber";
+function StatCard({ title, value, icon, isLoading }: {
+  title: string; value?: number; icon: React.ReactNode; isLoading: boolean;
 }) {
   return (
     <div className="bg-card border border-border rounded-xl p-4 flex flex-col shadow-sm">
@@ -252,11 +203,7 @@ function StatCard({
         <span className="text-xs font-medium text-muted-foreground">{title}</span>
         {icon}
       </div>
-      {isLoading ? (
-        <Skeleton className="h-7 w-12" />
-      ) : (
-        <span className="text-2xl font-bold text-foreground">{value ?? 0}</span>
-      )}
+      {isLoading ? <Skeleton className="h-7 w-12" /> : <span className="text-2xl font-bold text-foreground">{value ?? 0}</span>}
     </div>
   );
 }

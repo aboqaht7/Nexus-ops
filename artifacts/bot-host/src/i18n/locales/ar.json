@@ -1,0 +1,104 @@
+{
+  "nav": {
+    "dashboard": "لوحة التحكم",
+    "agent": "Agent-4",
+    "pricing": "الأسعار",
+    "signIn": "تسجيل الدخول",
+    "signUp": "إنشاء حساب",
+    "settings": "الإعدادات",
+    "upgrade": "ترقية الخطة",
+    "logout": "تسجيل الخروج",
+    "language": "اللغة"
+  },
+  "common": {
+    "loading": "جارٍ التحميل...",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "create": "إنشاء",
+    "edit": "تعديل",
+    "back": "رجوع",
+    "next": "التالي",
+    "search": "بحث",
+    "comingSoon": "قريباً",
+    "free": "مجاني",
+    "user": "المستخدم"
+  },
+  "home": {
+    "heroTag": "منصة شاملة لكل ما تبنيه",
+    "heroTitle": "أنشئ بوتات وألعاب ومواقع وتطبيقات",
+    "heroTitleAccent": "بوصف واحد بالعربي",
+    "heroSubtitle": "Agent-4 يبني لك أي شيء — بوتات Discord، ألعاب HTML5، مواقع، APIs، سكربتات Python — كل شيء يعمل ومستضاف 24/7.",
+    "ctaStart": "ابدأ مجاناً",
+    "ctaPricing": "الأسعار",
+    "promptPlaceholder": "اوصف ما تريد بناءه...",
+    "examplesTitle": "جرّب أمثلة:",
+    "projectTypesTitle": "بناء أي شيء",
+    "projectTypesSubtitle": "نوع مشروعك يحدد كل شيء — Agent-4 يعرف بالضبط ماذا يفعل",
+    "featuresTitle": "كل ما تحتاجه في منصة واحدة",
+    "pricingTitle": "خطط بسيطة وواضحة",
+    "footerRights": "© 2026 NexusOps. جميع الحقوق محفوظة."
+  },
+  "projectTypes": {
+    "discord-bot": "بوت Discord",
+    "discord-bot.desc": "بوتات احترافية بـ discord.js أو discord.py",
+    "website": "موقع ويب",
+    "website.desc": "صفحات HTML/CSS/JS ثابتة بمعاينة مباشرة",
+    "game": "لعبة",
+    "game.desc": "ألعاب HTML5 Canvas تعمل في المتصفح",
+    "web-app": "تطبيق ويب",
+    "web-app.desc": "تطبيقات React تفاعلية كاملة",
+    "api-server": "خادم API",
+    "api-server.desc": "Express أو FastAPI مع نقاط نهاية REST",
+    "python-script": "سكربت Python",
+    "python-script.desc": "أتمتة، scraping، معالجة بيانات"
+  },
+  "dashboard": {
+    "title": "نظرة عامة على مشاريعك",
+    "subtitle": "إدارة ومراقبة جميع مشاريعك من مكان واحد.",
+    "newProject": "مشروع جديد",
+    "stats": {
+      "total": "الإجمالي",
+      "running": "يعمل الآن",
+      "stopped": "متوقف",
+      "crashed": "تعطّل",
+      "restarts": "إعادة تشغيل"
+    },
+    "empty": {
+      "title": "لا توجد مشاريع بعد",
+      "subtitle": "ابدأ بإنشاء مشروعك الأول — بوت، موقع، لعبة أو تطبيق."
+    },
+    "planBanner": {
+      "expires": "تنتهي",
+      "upgradeBtn": "ترقية"
+    }
+  },
+  "createProject": {
+    "title": "مشروع جديد",
+    "subtitle": "اختر نوع المشروع وابدأ ببناءه فوراً",
+    "selectType": "اختر النوع",
+    "namePlaceholder": "اسم المشروع",
+    "createBtn": "إنشاء المشروع",
+    "useTemplate": "استخدم قالباً",
+    "fromScratch": "من الصفر",
+    "withAgent": "ابدأ مع Agent-4"
+  },
+  "pricing": {
+    "title": "خطط بسيطة وواضحة",
+    "subtitle": "اختر الخطة المناسبة لك. غيّرها أو ألغها في أي وقت.",
+    "monthly": "شهري",
+    "yearly": "سنوي",
+    "save": "وفّر 20%",
+    "perMonth": "/شهر",
+    "perYear": "/سنة",
+    "currentPlan": "خطتك الحالية",
+    "subscribe": "اشترك الآن"
+  },
+  "agent": {
+    "title": "Agent-4",
+    "subtitle": "وكيل ذكاء اصطناعي حقيقي يبني ويصلح مشاريعك تلقائياً",
+    "newConversation": "محادثة جديدة",
+    "messagePlaceholder": "اطلب من Agent-4 ما تريده...",
+    "send": "إرسال"
+  }
+}

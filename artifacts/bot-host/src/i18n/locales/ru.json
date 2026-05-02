@@ -1,0 +1,104 @@
+{
+  "nav": {
+    "dashboard": "Панель",
+    "agent": "Agent-4",
+    "pricing": "Цены",
+    "signIn": "Войти",
+    "signUp": "Регистрация",
+    "settings": "Настройки",
+    "upgrade": "Улучшить план",
+    "logout": "Выйти",
+    "language": "Язык"
+  },
+  "common": {
+    "loading": "Загрузка...",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "delete": "Удалить",
+    "create": "Создать",
+    "edit": "Изменить",
+    "back": "Назад",
+    "next": "Далее",
+    "search": "Поиск",
+    "comingSoon": "Скоро",
+    "free": "Бесплатно",
+    "user": "Пользователь"
+  },
+  "home": {
+    "heroTag": "Универсальная платформа для всего, что вы создаёте",
+    "heroTitle": "Создавайте ботов, игры, сайты и приложения",
+    "heroTitleAccent": "одним промптом",
+    "heroSubtitle": "Agent-4 построит для вас что угодно — Discord-боты, HTML5-игры, веб-сайты, API, Python-скрипты — всё работает и хостится 24/7.",
+    "ctaStart": "Начать бесплатно",
+    "ctaPricing": "Цены",
+    "promptPlaceholder": "Опишите, что хотите создать...",
+    "examplesTitle": "Попробуйте примеры:",
+    "projectTypesTitle": "Создавайте что угодно",
+    "projectTypesSubtitle": "Тип проекта настраивает всё — Agent-4 точно знает, что делать",
+    "featuresTitle": "Всё, что нужно, на одной платформе",
+    "pricingTitle": "Простые и прозрачные цены",
+    "footerRights": "© 2026 NexusOps. Все права защищены."
+  },
+  "projectTypes": {
+    "discord-bot": "Discord-бот",
+    "discord-bot.desc": "Профессиональные боты с discord.js или discord.py",
+    "website": "Веб-сайт",
+    "website.desc": "Статические HTML/CSS/JS страницы с живым превью",
+    "game": "Игра",
+    "game.desc": "HTML5 Canvas игры в браузере",
+    "web-app": "Веб-приложение",
+    "web-app.desc": "Полноценные интерактивные React-приложения",
+    "api-server": "API-сервер",
+    "api-server.desc": "Express или FastAPI с REST-эндпоинтами",
+    "python-script": "Python-скрипт",
+    "python-script.desc": "Автоматизация, скрейпинг, обработка данных"
+  },
+  "dashboard": {
+    "title": "Обзор ваших проектов",
+    "subtitle": "Управляйте и отслеживайте все проекты в одном месте.",
+    "newProject": "Новый проект",
+    "stats": {
+      "total": "Всего",
+      "running": "Работает",
+      "stopped": "Остановлен",
+      "crashed": "Сбой",
+      "restarts": "Перезапуски"
+    },
+    "empty": {
+      "title": "Проектов пока нет",
+      "subtitle": "Создайте свой первый проект — бота, сайт, игру или приложение."
+    },
+    "planBanner": {
+      "expires": "Истекает",
+      "upgradeBtn": "Улучшить"
+    }
+  },
+  "createProject": {
+    "title": "Новый проект",
+    "subtitle": "Выберите тип проекта и начинайте создавать сразу",
+    "selectType": "Выберите тип",
+    "namePlaceholder": "Название проекта",
+    "createBtn": "Создать проект",
+    "useTemplate": "Использовать шаблон",
+    "fromScratch": "С нуля",
+    "withAgent": "Начать с Agent-4"
+  },
+  "pricing": {
+    "title": "Простые и прозрачные цены",
+    "subtitle": "Выберите подходящий план. Меняйте или отменяйте в любое время.",
+    "monthly": "Ежемесячно",
+    "yearly": "Ежегодно",
+    "save": "Экономия 20%",
+    "perMonth": "/мес",
+    "perYear": "/год",
+    "currentPlan": "Ваш текущий план",
+    "subscribe": "Подписаться"
+  },
+  "agent": {
+    "title": "Agent-4",
+    "subtitle": "Настоящий автономный ИИ-агент, который создаёт и чинит ваши проекты",
+    "newConversation": "Новый разговор",
+    "messagePlaceholder": "Спросите Agent-4 о чём угодно...",
+    "send": "Отправить"
+  }
+}

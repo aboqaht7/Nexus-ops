@@ -1,0 +1,104 @@
+{
+  "nav": {
+    "dashboard": "控制台",
+    "agent": "Agent-4",
+    "pricing": "定价",
+    "signIn": "登录",
+    "signUp": "注册",
+    "settings": "设置",
+    "upgrade": "升级套餐",
+    "logout": "退出登录",
+    "language": "语言"
+  },
+  "common": {
+    "loading": "加载中...",
+    "save": "保存",
+    "cancel": "取消",
+    "delete": "删除",
+    "create": "创建",
+    "edit": "编辑",
+    "back": "返回",
+    "next": "下一步",
+    "search": "搜索",
+    "comingSoon": "即将推出",
+    "free": "免费",
+    "user": "用户"
+  },
+  "home": {
+    "heroTag": "一站式构建平台",
+    "heroTitle": "创建机器人、游戏、网站和应用",
+    "heroTitleAccent": "只需一个提示词",
+    "heroSubtitle": "Agent-4 帮你构建一切——Discord 机器人、HTML5 游戏、网站、API、Python 脚本——全部运行并 24/7 托管。",
+    "ctaStart": "免费开始",
+    "ctaPricing": "定价",
+    "promptPlaceholder": "描述你想构建什么...",
+    "examplesTitle": "试试这些例子：",
+    "projectTypesTitle": "构建任何东西",
+    "projectTypesSubtitle": "项目类型决定一切——Agent-4 知道该怎么做",
+    "featuresTitle": "一个平台，应有尽有",
+    "pricingTitle": "简单透明的定价",
+    "footerRights": "© 2026 NexusOps。保留所有权利。"
+  },
+  "projectTypes": {
+    "discord-bot": "Discord 机器人",
+    "discord-bot.desc": "使用 discord.js 或 discord.py 的专业机器人",
+    "website": "网站",
+    "website.desc": "带实时预览的静态 HTML/CSS/JS 页面",
+    "game": "游戏",
+    "game.desc": "在浏览器中运行的 HTML5 Canvas 游戏",
+    "web-app": "Web 应用",
+    "web-app.desc": "完整的交互式 React 应用",
+    "api-server": "API 服务器",
+    "api-server.desc": "带 REST 端点的 Express 或 FastAPI",
+    "python-script": "Python 脚本",
+    "python-script.desc": "自动化、爬虫、数据处理"
+  },
+  "dashboard": {
+    "title": "你的项目概览",
+    "subtitle": "在一处管理和监控所有项目。",
+    "newProject": "新项目",
+    "stats": {
+      "total": "总数",
+      "running": "运行中",
+      "stopped": "已停止",
+      "crashed": "已崩溃",
+      "restarts": "重启次数"
+    },
+    "empty": {
+      "title": "还没有项目",
+      "subtitle": "创建你的第一个项目——机器人、网站、游戏或应用。"
+    },
+    "planBanner": {
+      "expires": "到期",
+      "upgradeBtn": "升级"
+    }
+  },
+  "createProject": {
+    "title": "新项目",
+    "subtitle": "选择项目类型，立即开始构建",
+    "selectType": "选择类型",
+    "namePlaceholder": "项目名称",
+    "createBtn": "创建项目",
+    "useTemplate": "使用模板",
+    "fromScratch": "从零开始",
+    "withAgent": "通过 Agent-4 开始"
+  },
+  "pricing": {
+    "title": "简单透明的定价",
+    "subtitle": "选择适合你的套餐。随时更改或取消。",
+    "monthly": "月付",
+    "yearly": "年付",
+    "save": "节省 20%",
+    "perMonth": "/月",
+    "perYear": "/年",
+    "currentPlan": "你当前的套餐",
+    "subscribe": "立即订阅"
+  },
+  "agent": {
+    "title": "Agent-4",
+    "subtitle": "真正自主的 AI 智能体，可构建和修复你的项目",
+    "newConversation": "新对话",
+    "messagePlaceholder": "向 Agent-4 提问...",
+    "send": "发送"
+  }
+}

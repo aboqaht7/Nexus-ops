@@ -9,6 +9,17 @@ export interface HealthStatus {
   status: string;
 }
 
+export type ProjectType = (typeof ProjectType)[keyof typeof ProjectType];
+
+export const ProjectType = {
+  "discord-bot": "discord-bot",
+  website: "website",
+  game: "game",
+  "web-app": "web-app",
+  "api-server": "api-server",
+  "python-script": "python-script",
+} as const;
+
 export type BotLanguage = (typeof BotLanguage)[keyof typeof BotLanguage];
 
 export const BotLanguage = {
@@ -36,6 +47,7 @@ export interface Bot {
   createdAt: string;
   startedAt?: string | null;
   uptimeSeconds?: number | null;
+  projectType?: ProjectType;
 }
 
 export type BotLogsLogsItemLevel =

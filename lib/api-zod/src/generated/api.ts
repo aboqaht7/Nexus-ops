@@ -30,6 +30,16 @@ export const ListBotsResponseItem = zod.object({
   createdAt: zod.coerce.date(),
   startedAt: zod.coerce.date().nullish(),
   uptimeSeconds: zod.number().nullish(),
+  projectType: zod
+    .enum([
+      "discord-bot",
+      "website",
+      "game",
+      "web-app",
+      "api-server",
+      "python-script",
+    ])
+    .optional(),
 });
 export const ListBotsResponse = zod.array(ListBotsResponseItem);
 
@@ -51,6 +61,16 @@ export const GetBotResponse = zod.object({
   createdAt: zod.coerce.date(),
   startedAt: zod.coerce.date().nullish(),
   uptimeSeconds: zod.number().nullish(),
+  projectType: zod
+    .enum([
+      "discord-bot",
+      "website",
+      "game",
+      "web-app",
+      "api-server",
+      "python-script",
+    ])
+    .optional(),
 });
 
 /**
@@ -78,6 +98,16 @@ export const StartBotResponse = zod.object({
   createdAt: zod.coerce.date(),
   startedAt: zod.coerce.date().nullish(),
   uptimeSeconds: zod.number().nullish(),
+  projectType: zod
+    .enum([
+      "discord-bot",
+      "website",
+      "game",
+      "web-app",
+      "api-server",
+      "python-script",
+    ])
+    .optional(),
 });
 
 /**
@@ -98,6 +128,16 @@ export const StopBotResponse = zod.object({
   createdAt: zod.coerce.date(),
   startedAt: zod.coerce.date().nullish(),
   uptimeSeconds: zod.number().nullish(),
+  projectType: zod
+    .enum([
+      "discord-bot",
+      "website",
+      "game",
+      "web-app",
+      "api-server",
+      "python-script",
+    ])
+    .optional(),
 });
 
 /**
@@ -118,6 +158,16 @@ export const RestartBotResponse = zod.object({
   createdAt: zod.coerce.date(),
   startedAt: zod.coerce.date().nullish(),
   uptimeSeconds: zod.number().nullish(),
+  projectType: zod
+    .enum([
+      "discord-bot",
+      "website",
+      "game",
+      "web-app",
+      "api-server",
+      "python-script",
+    ])
+    .optional(),
 });
 
 /**

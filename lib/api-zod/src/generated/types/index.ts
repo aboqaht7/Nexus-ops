@@ -34,4 +34,5 @@ export * from "./importResult";
 export * from "./importUrlBody";
 export * from "./newConversationBody";
 export * from "./newMessageBody";
+export * from "./projectType";
 export * from "./saveResult";

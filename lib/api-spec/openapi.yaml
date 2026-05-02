@@ -547,6 +547,16 @@ components:
       required:
         - status
 
+    ProjectType:
+      type: string
+      enum:
+        - discord-bot
+        - website
+        - game
+        - web-app
+        - api-server
+        - python-script
+
     Bot:
       type: object
       properties:
@@ -576,6 +586,8 @@ components:
         uptimeSeconds:
           type: number
           nullable: true
+        projectType:
+          $ref: "#/components/schemas/ProjectType"
       required:
         - id
         - name

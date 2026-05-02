@@ -23,6 +23,27 @@ const MAX_RESTART_DELAY_MS = 30_000;
 
 export type BotStatus = "running" | "stopped" | "crashed" | "starting";
 export type BotLanguage = "javascript" | "python";
+export type ProjectType =
+  | "discord-bot"
+  | "website"
+  | "game"
+  | "web-app"
+  | "api-server"
+  | "python-script";
+
+export const PROJECT_TYPES: ProjectType[] = [
+  "discord-bot",
+  "website",
+  "game",
+  "web-app",
+  "api-server",
+  "python-script",
+];
+
+/** Project types that produce static/web output viewable in an iframe */
+export function isWebProject(type: ProjectType | undefined): boolean {
+  return type === "website" || type === "game" || type === "web-app";
+}
 
 export interface BotRecord {
   id: string;
@@ -36,6 +57,7 @@ export interface BotRecord {
   startedAt: string | null;
   uptimeSeconds: number | null;
   userId?: string;
+  projectType?: ProjectType;
 }
 
 export interface LogEntry {
@@ -231,6 +253,7 @@ export function registerBot(
   code: string,
   language: BotLanguage,
   userId?: string,
+  projectType: ProjectType = "discord-bot",
 ): BotRecord {
   const bot: BotRecord = {
     id: randomUUID(),
@@ -243,6 +266,7 @@ export function registerBot(
     createdAt: new Date().toISOString(),
     startedAt: null,
     uptimeSeconds: null,
+    projectType,
     ...(userId ? { userId } : {}),
   };
 
@@ -250,19 +274,43 @@ export function registerBot(
   const dir = getBotDir(bot.id);
   writeFileSync(join(dir, filename), code, "utf-8");
 
-  // Setup environment
+  // Setup environment based on project type
   if (language === "javascript") {
     ensurePackageJson(bot);
   } else {
     ensureRequirementsTxt(bot);
   }
 
+  // For static web projects, ensure an index.html so the iframe preview works
+  if (isWebProject(projectType) && !filename.endsWith(".html")) {
+    const indexPath = join(dir, "index.html");
+    if (!existsSync(indexPath)) {
+      writeFileSync(indexPath, code.trim().startsWith("<") ? code : defaultIndexHtml(name), "utf-8");
+    }
+  }
+
   const bots = loadBots();
   bots.push(bot);
   saveBots(bots);
 
-  logger.info({ botId: bot.id, name, filename }, "Bot registered");
+  logger.info({ botId: bot.id, name, filename, projectType }, "Project registered");
   return bot;
+}
+
+function defaultIndexHtml(title: string): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>${title}</title>
+</head>
+<body>
+  <h1>${title}</h1>
+  <p>Empty project — ask Agent-4 to build it.</p>
+</body>
+</html>
+`;
 }
 
 export function deleteBot(id: string): boolean {

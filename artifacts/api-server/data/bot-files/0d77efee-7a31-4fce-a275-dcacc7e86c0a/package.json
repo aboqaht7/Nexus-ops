@@ -1,0 +1,9 @@
+{
+  "name": "test-website",
+  "version": "1.0.0",
+  "type": "commonjs",
+  "main": "index.html",
+  "scripts": {
+    "start": "node index.html"
+  }
+}

@@ -270,7 +270,7 @@ export default function Pricing() {
                   {priceObj ? (
                     <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
                       <span style={{ fontSize: 30, fontWeight: 700, color: R.text, fontFamily: "'Fraunces', serif", lineHeight: 1 }}>
-                        {billing === "yearly" ? priceObj.perMonth : priceObj.label}
+                        {billing === "yearly" ? (priceObj as unknown as {perMonth: string}).perMonth : priceObj.label}
                       </span>
                       <span style={{ fontSize: 12, color: R.muted }}>/شهر</span>
                     </div>
