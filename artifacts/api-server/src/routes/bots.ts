@@ -181,30 +181,169 @@ router.post("/bots/create-from-code", (req, res): void => {
 });
 
 /* ── Starter templates by project type ───────────────────────────────── */
-const STARTER_TEMPLATES: Record<string, (name: string) => string> = {
+
+// Sanitize the project name before interpolating into HTML / JS / Python
+// templates. Strips characters that could break out of attribute, text, JS
+// string, or Python string contexts. Falls back to a safe default if empty.
+function safeName(raw: string): string {
+  const cleaned = raw
+    .replace(/[<>"'`$\\{}\r\n\t]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 64);
+  return cleaned || "My Project";
+}
+
+const STARTER_TEMPLATES_RAW: Record<string, (name: string) => string> = {
   "website": (name) => `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="${name} — built with NexusOps" />
   <title>${name}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      min-height: 100vh; display: grid; place-items: center;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white; text-align: center; padding: 2rem;
+    *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #FAF7F2; --fg: #1A1A1A; --muted: #6B6B6B;
+      --accent: #F26207; --accent-soft: #FEF1E6;
+      --card: #FFFFFF; --border: #ECE7DF;
     }
-    h1 { font-size: clamp(2rem, 6vw, 4rem); margin-bottom: 1rem; }
-    p { font-size: 1.25rem; opacity: 0.9; max-width: 600px; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg); color: var(--fg); line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 1.5rem; }
+    nav {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(250,247,242,0.8); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border); padding: 1rem 0;
+    }
+    nav .container { display: flex; align-items: center; justify-content: space-between; }
+    .logo { font-weight: 800; font-size: 1.25rem; letter-spacing: -0.02em; }
+    .logo span { color: var(--accent); }
+    .nav-links { display: flex; gap: 2rem; list-style: none; }
+    .nav-links a { color: var(--muted); text-decoration: none; font-weight: 500; font-size: 0.95rem; transition: color .2s; }
+    .nav-links a:hover { color: var(--fg); }
+    .btn {
+      display: inline-flex; align-items: center; gap: .5rem;
+      padding: .75rem 1.5rem; border-radius: 10px; font-weight: 600;
+      text-decoration: none; transition: all .2s; border: none; cursor: pointer; font-size: .95rem;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: #D9540A; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(242,98,7,0.25); }
+    .btn-ghost { background: transparent; color: var(--fg); border: 1px solid var(--border); }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+    .hero { padding: 6rem 0 5rem; text-align: center; }
+    .badge {
+      display: inline-flex; align-items: center; gap: .5rem;
+      padding: .4rem .9rem; background: var(--accent-soft); color: var(--accent);
+      border-radius: 999px; font-size: .85rem; font-weight: 600; margin-bottom: 1.5rem;
+    }
+    .hero h1 {
+      font-size: clamp(2.25rem, 6vw, 4rem); font-weight: 800;
+      letter-spacing: -0.03em; line-height: 1.1; margin-bottom: 1.25rem;
+    }
+    .hero h1 em { font-style: normal; color: var(--accent); }
+    .hero p {
+      font-size: clamp(1rem, 2vw, 1.2rem); color: var(--muted);
+      max-width: 620px; margin: 0 auto 2rem;
+    }
+    .hero-cta { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; }
+    section { padding: 4rem 0; }
+    .section-title { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; text-align: center; margin-bottom: .75rem; }
+    .section-sub { text-align: center; color: var(--muted); margin-bottom: 3rem; max-width: 520px; margin-left: auto; margin-right: auto; }
+    .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; }
+    .feature {
+      background: var(--card); border: 1px solid var(--border);
+      padding: 1.75rem; border-radius: 16px; transition: all .25s;
+    }
+    .feature:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,0.06); border-color: var(--accent); }
+    .feature-icon {
+      width: 44px; height: 44px; border-radius: 12px; background: var(--accent-soft);
+      color: var(--accent); display: grid; place-items: center; margin-bottom: 1rem; font-size: 1.25rem;
+    }
+    .feature h3 { font-size: 1.1rem; margin-bottom: .5rem; font-weight: 700; }
+    .feature p { color: var(--muted); font-size: .95rem; }
+    .cta-section {
+      background: linear-gradient(135deg, var(--accent) 0%, #D9540A 100%);
+      color: white; border-radius: 24px; padding: 3.5rem 2rem; text-align: center;
+      margin: 2rem 0 4rem;
+    }
+    .cta-section h2 { font-size: clamp(1.6rem, 4vw, 2.4rem); margin-bottom: .75rem; font-weight: 700; }
+    .cta-section p { opacity: 0.95; margin-bottom: 1.75rem; }
+    .cta-section .btn { background: white; color: var(--accent); }
+    .cta-section .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+    footer { padding: 2rem 0; border-top: 1px solid var(--border); color: var(--muted); font-size: .9rem; text-align: center; }
+    @media (max-width: 640px) { .nav-links { display: none; } }
   </style>
 </head>
 <body>
-  <main>
-    <h1>${name}</h1>
-    <p>Your website is live. Ask Agent-4 to build whatever you imagine.</p>
-  </main>
+  <nav>
+    <div class="container">
+      <div class="logo">${name.split(/\s+/)[0] || name}<span>.</span></div>
+      <ul class="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#cta">Get started</a></li>
+      </ul>
+      <a href="#cta" class="btn btn-primary">Get started →</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="container">
+      <span class="badge">✨ Live and ready</span>
+      <h1>Welcome to <em>${name}</em></h1>
+      <p>A modern, fast website ready to grow with your ideas. Tell Agent-4 what to add — sections, designs, integrations — and watch it ship in seconds.</p>
+      <div class="hero-cta">
+        <a href="#features" class="btn btn-primary">Explore →</a>
+        <a href="#cta" class="btn btn-ghost">Learn more</a>
+      </div>
+    </div>
+  </header>
+
+  <section id="features">
+    <div class="container">
+      <h2 class="section-title">Built for what's next</h2>
+      <p class="section-sub">Every piece is editable. Just describe what you want.</p>
+      <div class="features">
+        <div class="feature">
+          <div class="feature-icon">⚡</div>
+          <h3>Lightning fast</h3>
+          <p>Pure HTML, CSS and JS — zero bloat, instant loads on every device.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🎨</div>
+          <h3>Beautiful by default</h3>
+          <p>Modern typography, thoughtful spacing, and a polished color system out of the box.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📱</div>
+          <h3>Fully responsive</h3>
+          <p>Looks great from a phone to a 4K monitor — no extra work needed.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="cta">
+    <div class="container">
+      <div class="cta-section">
+        <h2>Ready to make it yours?</h2>
+        <p>Ask Agent-4 to add sections, change the design, or integrate any service.</p>
+        <a href="#" class="btn">Start building</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">© ${new Date().getFullYear()} ${name}. Built with NexusOps.</div>
+  </footer>
 </body>
 </html>
 `,
@@ -212,29 +351,179 @@ const STARTER_TEMPLATES: Record<string, (name: string) => string> = {
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>${name}</title>
   <style>
-    body { margin: 0; background: #111; display: grid; place-items: center; min-height: 100vh; font-family: sans-serif; color: white; }
-    canvas { background: #222; border: 2px solid #444; }
-    .ui { position: fixed; top: 10px; left: 10px; }
+    *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: radial-gradient(ellipse at top, #1a1a2e 0%, #0a0a1a 100%);
+      min-height: 100vh; display: grid; place-items: center;
+      color: #fff; padding: 1rem; overflow: hidden;
+    }
+    .game-shell {
+      background: rgba(255,255,255,0.04); backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.08); border-radius: 24px;
+      padding: 1.5rem; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    h1 {
+      font-size: 1.5rem; margin-bottom: 1rem; text-align: center; font-weight: 700;
+      background: linear-gradient(90deg, #F26207, #FFB47B);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .hud {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 1rem; font-size: .95rem;
+    }
+    .hud-item { background: rgba(255,255,255,0.06); padding: .5rem 1rem; border-radius: 8px; }
+    .hud-item strong { color: #F26207; margin-left: .35rem; }
+    canvas { background: #0d0d1f; border-radius: 12px; display: block; max-width: 100%; height: auto; }
+    .controls { margin-top: 1rem; text-align: center; color: rgba(255,255,255,0.55); font-size: .85rem; }
+    .controls kbd {
+      background: rgba(255,255,255,0.1); padding: .15rem .5rem; border-radius: 4px;
+      font-family: monospace; font-size: .8rem; margin: 0 .15rem;
+    }
+    .overlay {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(6px);
+      display: none; place-items: center; flex-direction: column; gap: 1rem;
+      border-radius: 12px; padding: 2rem; text-align: center;
+    }
+    .overlay.show { display: grid; }
+    .overlay h2 { font-size: 2rem; font-weight: 800; }
+    .overlay button {
+      background: #F26207; color: white; border: none; padding: .8rem 2rem;
+      border-radius: 10px; font-weight: 600; font-size: 1rem; cursor: pointer;
+      transition: all .2s;
+    }
+    .overlay button:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(242,98,7,0.4); }
+    .canvas-wrap { position: relative; }
   </style>
 </head>
 <body>
-  <div class="ui">Score: <span id="score">0</span></div>
-  <canvas id="game" width="800" height="600"></canvas>
+  <div class="game-shell">
+    <h1>🐍 ${name}</h1>
+    <div class="hud">
+      <div class="hud-item">Score:<strong id="score">0</strong></div>
+      <div class="hud-item">High:<strong id="high">0</strong></div>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="game" width="480" height="480"></canvas>
+      <div class="overlay" id="overlay">
+        <h2 id="overlayTitle">Game Over</h2>
+        <p id="overlayMsg">Press space or tap to play again</p>
+        <button onclick="startGame()">Play again</button>
+      </div>
+    </div>
+    <div class="controls">
+      Use <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> or swipe · <kbd>Space</kbd> to pause
+    </div>
+  </div>
   <script>
-    const canvas = document.getElementById("game");
-    const ctx = canvas.getContext("2d");
-    let x = 400, y = 300, vx = 3, vy = 2, score = 0;
-    function loop() {
-      ctx.fillStyle = "#222"; ctx.fillRect(0, 0, 800, 600);
-      x += vx; y += vy;
-      if (x < 20 || x > 780) { vx *= -1; score++; document.getElementById("score").textContent = score; }
-      if (y < 20 || y > 580) { vy *= -1; score++; document.getElementById("score").textContent = score; }
-      ctx.fillStyle = "#F26207"; ctx.beginPath(); ctx.arc(x, y, 20, 0, Math.PI * 2); ctx.fill();
-      requestAnimationFrame(loop);
+    const cv = document.getElementById('game');
+    const ctx = cv.getContext('2d');
+    const SIZE = 24;
+    const COLS = cv.width / SIZE;
+    const ROWS = cv.height / SIZE;
+    const overlay = document.getElementById('overlay');
+    const overlayTitle = document.getElementById('overlayTitle');
+    const overlayMsg = document.getElementById('overlayMsg');
+
+    let snake, dir, nextDir, food, score, speed, paused, alive, tickTimer;
+    let high = +(localStorage.getItem('${name}_high') || 0);
+    document.getElementById('high').textContent = high;
+
+    function reset() {
+      snake = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
+      dir = { x: 1, y: 0 }; nextDir = dir;
+      score = 0; speed = 130; paused = false; alive = true;
+      placeFood();
+      document.getElementById('score').textContent = 0;
+      overlay.classList.remove('show');
     }
-    loop();
+    function placeFood() {
+      while (true) {
+        const x = Math.floor(Math.random() * COLS);
+        const y = Math.floor(Math.random() * ROWS);
+        if (!snake.some(s => s.x === x && s.y === y)) { food = { x, y }; return; }
+      }
+    }
+    function step() {
+      if (paused || !alive) return;
+      dir = nextDir;
+      const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+      if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) return die();
+      if (snake.some(s => s.x === head.x && s.y === head.y)) return die();
+      snake.unshift(head);
+      if (head.x === food.x && head.y === food.y) {
+        score += 10;
+        document.getElementById('score').textContent = score;
+        if (score > high) { high = score; localStorage.setItem('${name}_high', high); document.getElementById('high').textContent = high; }
+        if (speed > 60) speed -= 2;
+        placeFood();
+      } else snake.pop();
+      draw();
+    }
+    function draw() {
+      ctx.fillStyle = '#0d0d1f'; ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.fillStyle = '#F26207';
+      ctx.beginPath();
+      ctx.arc(food.x * SIZE + SIZE/2, food.y * SIZE + SIZE/2, SIZE/2 - 3, 0, Math.PI * 2);
+      ctx.fill();
+      snake.forEach((s, i) => {
+        ctx.fillStyle = i === 0 ? '#FFB47B' : 'rgba(242,98,7,' + (1 - i/snake.length * 0.7) + ')';
+        roundRect(s.x * SIZE + 1, s.y * SIZE + 1, SIZE - 2, SIZE - 2, 5);
+      });
+    }
+    function roundRect(x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x+r, y);
+      ctx.arcTo(x+w, y, x+w, y+h, r);
+      ctx.arcTo(x+w, y+h, x, y+h, r);
+      ctx.arcTo(x, y+h, x, y, r);
+      ctx.arcTo(x, y, x+w, y, r);
+      ctx.closePath(); ctx.fill();
+    }
+    function die() {
+      alive = false; clearInterval(tickTimer);
+      overlayTitle.textContent = '💥 Game Over';
+      overlayMsg.textContent = 'Score: ' + score + (score === high && score > 0 ? ' · New high!' : '');
+      overlay.classList.add('show');
+    }
+    function startGame() {
+      reset();
+      clearInterval(tickTimer);
+      tickTimer = setInterval(step, speed);
+      const adjustSpeed = setInterval(() => {
+        if (!alive) { clearInterval(adjustSpeed); return; }
+        clearInterval(tickTimer);
+        tickTimer = setInterval(step, speed);
+      }, 1000);
+    }
+
+    document.addEventListener('keydown', e => {
+      const k = e.key;
+      if ((k === 'ArrowUp' || k === 'w') && dir.y !== 1) nextDir = { x: 0, y: -1 };
+      else if ((k === 'ArrowDown' || k === 's') && dir.y !== -1) nextDir = { x: 0, y: 1 };
+      else if ((k === 'ArrowLeft' || k === 'a') && dir.x !== 1) nextDir = { x: -1, y: 0 };
+      else if ((k === 'ArrowRight' || k === 'd') && dir.x !== -1) nextDir = { x: 1, y: 0 };
+      else if (k === ' ') { e.preventDefault(); if (!alive) startGame(); else paused = !paused; }
+    });
+    let touch;
+    cv.addEventListener('touchstart', e => { touch = e.touches[0]; });
+    cv.addEventListener('touchend', e => {
+      if (!touch) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - touch.clientX, dy = t.clientY - touch.clientY;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        if (dx > 30 && dir.x !== -1) nextDir = { x: 1, y: 0 };
+        else if (dx < -30 && dir.x !== 1) nextDir = { x: -1, y: 0 };
+      } else {
+        if (dy > 30 && dir.y !== -1) nextDir = { x: 0, y: 1 };
+        else if (dy < -30 && dir.y !== 1) nextDir = { x: 0, y: -1 };
+      }
+    });
+
+    startGame();
   </script>
 </body>
 </html>
@@ -243,103 +532,537 @@ const STARTER_TEMPLATES: Record<string, (name: string) => string> = {
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>${name}</title>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+  </style>
 </head>
-<body>
+<body class="bg-[#FAF7F2]">
   <div id="root"></div>
   <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
     function App() {
-      const [count, setCount] = React.useState(0);
+      const [tasks, setTasks] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('${name}_tasks') || '[]'); } catch { return []; }
+      });
+      const [input, setInput] = useState('');
+      const [filter, setFilter] = useState('all');
+
+      useEffect(() => {
+        localStorage.setItem('${name}_tasks', JSON.stringify(tasks));
+      }, [tasks]);
+
+      const filtered = useMemo(() => tasks.filter(t =>
+        filter === 'all' ? true : filter === 'active' ? !t.done : t.done
+      ), [tasks, filter]);
+      const remaining = tasks.filter(t => !t.done).length;
+
+      function addTask(e) {
+        e.preventDefault();
+        const text = input.trim();
+        if (!text) return;
+        setTasks([{ id: Date.now(), text, done: false }, ...tasks]);
+        setInput('');
+      }
+      function toggle(id) { setTasks(tasks.map(t => t.id === id ? { ...t, done: !t.done } : t)); }
+      function remove(id) { setTasks(tasks.filter(t => t.id !== id)); }
+      function clearDone() { setTasks(tasks.filter(t => !t.done)); }
+
       return (
-        <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100 flex items-center justify-center p-8">
-          <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">${name}</h1>
-            <p className="text-gray-500 mb-6">Your React app is live</p>
-            <div className="text-6xl font-bold text-orange-600 mb-6">{count}</div>
-            <button onClick={() => setCount(c => c + 1)}
-              className="bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-700">
-              Click me
-            </button>
+        <div className="min-h-screen flex flex-col items-center px-4 py-12">
+          <div className="w-full max-w-xl">
+            <header className="mb-8 text-center">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FEF1E6] text-[#F26207] text-xs font-semibold mb-4">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#F26207]"></span> Live
+              </div>
+              <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">${name}</h1>
+              <p className="text-gray-500 mt-2">Your interactive React app — fully editable by Agent-4</p>
+            </header>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <form onSubmit={addTask} className="p-5 border-b border-gray-100 flex gap-2">
+                <input
+                  value={input} onChange={e => setInput(e.target.value)}
+                  placeholder="Add a task and press Enter..."
+                  className="flex-1 px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#F26207] focus:border-transparent text-gray-800"
+                />
+                <button className="px-5 py-3 bg-[#F26207] text-white rounded-xl font-semibold hover:bg-[#D9540A] active:scale-95 transition-all">
+                  Add
+                </button>
+              </form>
+
+              <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between text-sm">
+                <span className="text-gray-500">{remaining} {remaining === 1 ? 'task' : 'tasks'} left</span>
+                <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+                  {['all', 'active', 'done'].map(f => (
+                    <button key={f} onClick={() => setFilter(f)}
+                      className={\`px-3 py-1 rounded-md text-xs font-semibold transition-colors capitalize \${filter === f ? 'bg-white text-[#F26207] shadow-sm' : 'text-gray-500 hover:text-gray-700'}\`}>
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <ul className="divide-y divide-gray-100 max-h-96 overflow-y-auto scrollbar-hide">
+                {filtered.length === 0 ? (
+                  <li className="p-12 text-center text-gray-400 text-sm">
+                    {tasks.length === 0 ? '🎉 No tasks yet. Add your first one above.' : 'Nothing here.'}
+                  </li>
+                ) : filtered.map(t => (
+                  <li key={t.id} className="px-5 py-3 flex items-center gap-3 group hover:bg-gray-50 transition-colors">
+                    <button onClick={() => toggle(t.id)}
+                      className={\`w-5 h-5 rounded-md border-2 grid place-items-center transition-colors \${t.done ? 'bg-[#F26207] border-[#F26207]' : 'border-gray-300 hover:border-[#F26207]'}\`}>
+                      {t.done && <svg viewBox="0 0 12 12" className="w-3 h-3 text-white"><path d="M2 6l3 3 5-6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                    </button>
+                    <span className={\`flex-1 text-sm \${t.done ? 'line-through text-gray-400' : 'text-gray-800'}\`}>{t.text}</span>
+                    <button onClick={() => remove(t.id)}
+                      className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all text-sm">
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+
+              {tasks.some(t => t.done) && (
+                <div className="px-5 py-3 border-t border-gray-100 bg-gray-50">
+                  <button onClick={clearDone} className="text-xs text-gray-500 hover:text-[#F26207] font-medium transition-colors">
+                    Clear completed
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <p className="text-center text-gray-400 text-xs mt-6">
+              Tell Agent-4 what to build next — auth, charts, integrations, anything.
+            </p>
           </div>
         </div>
       );
     }
-    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
   </script>
 </body>
 </html>
 `,
-  "python-script": (name) => `# ${name} — Python script
-# Ask Agent-4 to extend this script with your logic.
+  "python-script": (name) => `"""${name} — Python automation script.
 
-def main():
-    print("Hello from ${name}!")
-    # Your code here
+A clean starter with logging, argparse, and clear structure.
+Tell Agent-4 what to automate and watch it build.
+"""
+from __future__ import annotations
+
+import argparse
+import logging
+import sys
+from pathlib import Path
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger("${name}")
+
+
+def run(args: argparse.Namespace) -> int:
+    """Main entry — replace with your logic."""
+    log.info("Starting ${name}")
+    log.info("Arguments: %s", vars(args))
+
+    # Example: process a file or fetch data
+    if args.input:
+        path = Path(args.input)
+        if not path.exists():
+            log.error("Input not found: %s", path)
+            return 1
+        log.info("Processing %s (%d bytes)", path.name, path.stat().st_size)
+
+    log.info("Done ✓")
+    return 0
+
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        prog="${name}",
+        description="${name} — built with NexusOps",
+    )
+    p.add_argument("-i", "--input", help="Optional input file path")
+    p.add_argument("-v", "--verbose", action="store_true", help="Enable debug logging")
+    return p.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+    try:
+        return run(args)
+    except KeyboardInterrupt:
+        log.warning("Interrupted")
+        return 130
+    except Exception:
+        log.exception("Unhandled error")
+        return 1
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
 `,
-  "api-server-javascript": (name) => `// ${name} — Express API server
+  "api-server-javascript": (name) => `// ${name} — Express REST API
+// A production-ready starter with CORS, JSON parsing, validation,
+// structured error handling and a sample resource.
+//
+// Tell Agent-4 to add endpoints, auth, a database — anything.
+
 const express = require("express");
+const cors = require("cors");
+
 const app = express();
-app.use(express.json());
-
-app.get("/", (_req, res) => res.json({ name: "${name}", status: "ok" }));
-app.get("/api/hello", (_req, res) => res.json({ message: "Hello from ${name}!" }));
-
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, "0.0.0.0", () => console.log(\`API listening on port \${PORT}\`));
-`,
-  "api-server-python": (name) => `# ${name} — FastAPI server
-from fastapi import FastAPI
-import os
-import uvicorn
 
-app = FastAPI(title="${name}")
+app.use(cors());
+app.use(express.json({ limit: "1mb" }));
+
+// Request logger
+app.use((req, _res, next) => {
+  console.log(\`\${new Date().toISOString()} \${req.method} \${req.url}\`);
+  next();
+});
+
+// ── Health & root ─────────────────────────────────────────────────
+app.get("/", (_req, res) => {
+  res.json({ name: "${name}", status: "ok", uptime: process.uptime() });
+});
+app.get("/healthz", (_req, res) => res.json({ status: "ok" }));
+
+// ── Sample resource (in-memory store) ─────────────────────────────
+const items = [
+  { id: 1, title: "Welcome to ${name}", done: false },
+];
+let nextId = 2;
+
+app.get("/api/items", (_req, res) => res.json({ items }));
+
+app.get("/api/items/:id", (req, res) => {
+  const item = items.find((i) => i.id === Number(req.params.id));
+  if (!item) return res.status(404).json({ error: "not_found" });
+  res.json(item);
+});
+
+app.post("/api/items", (req, res) => {
+  const { title } = req.body || {};
+  if (typeof title !== "string" || !title.trim()) {
+    return res.status(400).json({ error: "title is required" });
+  }
+  const item = { id: nextId++, title: title.trim(), done: false };
+  items.push(item);
+  res.status(201).json(item);
+});
+
+app.patch("/api/items/:id", (req, res) => {
+  const item = items.find((i) => i.id === Number(req.params.id));
+  if (!item) return res.status(404).json({ error: "not_found" });
+  if (typeof req.body?.title === "string") item.title = req.body.title;
+  if (typeof req.body?.done === "boolean") item.done = req.body.done;
+  res.json(item);
+});
+
+app.delete("/api/items/:id", (req, res) => {
+  const idx = items.findIndex((i) => i.id === Number(req.params.id));
+  if (idx === -1) return res.status(404).json({ error: "not_found" });
+  items.splice(idx, 1);
+  res.status(204).end();
+});
+
+// ── 404 + error handlers ──────────────────────────────────────────
+app.use((_req, res) => res.status(404).json({ error: "route_not_found" }));
+app.use((err, _req, res, _next) => {
+  console.error("Server error:", err);
+  res.status(500).json({ error: "internal_error" });
+});
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(\`✅ ${name} API listening on http://0.0.0.0:\${PORT}\`);
+});
+`,
+  "api-server-python": (name) => `"""${name} — FastAPI REST API.
+
+Production-ready starter with CORS, Pydantic models, error handling
+and a sample resource. Tell Agent-4 to add endpoints, auth, a database.
+"""
+from __future__ import annotations
+
+import os
+from typing import List, Optional
+
+import uvicorn
+from fastapi import FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+
+app = FastAPI(
+    title="${name}",
+    description="${name} — built with NexusOps",
+    version="1.0.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+class ItemIn(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    done: bool = False
+
+
+class Item(ItemIn):
+    id: int
+
+
+class ItemUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    done: Optional[bool] = None
+
+
+_items: List[Item] = [Item(id=1, title="Welcome to ${name}", done=False)]
+_next_id = 2
+
 
 @app.get("/")
 def root():
     return {"name": "${name}", "status": "ok"}
 
-@app.get("/api/hello")
-def hello():
-    return {"message": "Hello from ${name}!"}
+
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}
+
+
+@app.get("/api/items", response_model=List[Item])
+def list_items():
+    return _items
+
+
+@app.get("/api/items/{item_id}", response_model=Item)
+def get_item(item_id: int):
+    for it in _items:
+        if it.id == item_id:
+            return it
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not_found")
+
+
+@app.post("/api/items", response_model=Item, status_code=status.HTTP_201_CREATED)
+def create_item(payload: ItemIn):
+    global _next_id
+    item = Item(id=_next_id, **payload.model_dump())
+    _next_id += 1
+    _items.append(item)
+    return item
+
+
+@app.patch("/api/items/{item_id}", response_model=Item)
+def update_item(item_id: int, payload: ItemUpdate):
+    for i, it in enumerate(_items):
+        if it.id == item_id:
+            data = it.model_dump()
+            update = payload.model_dump(exclude_unset=True)
+            data.update(update)
+            _items[i] = Item(**data)
+            return _items[i]
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not_found")
+
+
+@app.delete("/api/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_item(item_id: int):
+    for i, it in enumerate(_items):
+        if it.id == item_id:
+            _items.pop(i)
+            return
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not_found")
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 3000))
     uvicorn.run(app, host="0.0.0.0", port=port)
 `,
   "discord-bot-javascript": (name) => `// ${name} — Discord bot (discord.js v14)
-const { Client, GatewayIntentBits } = require("discord.js");
+// Production-ready starter: slash commands, embeds, error handling, graceful shutdown.
+// Add the BOT_TOKEN secret in your project, then ask Agent-4 to add new commands.
+
+const {
+  Client,
+  GatewayIntentBits,
+  EmbedBuilder,
+  REST,
+  Routes,
+  SlashCommandBuilder,
+  Events,
+} = require("discord.js");
+
+const TOKEN = process.env.BOT_TOKEN;
+if (!TOKEN) {
+  console.error("❌ Missing BOT_TOKEN environment variable");
+  process.exit(1);
+}
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
 });
 
-client.once("ready", () => {
-  console.log(\`✅ \${client.user.tag} is online\`);
+// ── Slash commands ────────────────────────────────────────────────
+const commands = [
+  new SlashCommandBuilder().setName("ping").setDescription("Replies with latency"),
+  new SlashCommandBuilder().setName("hello").setDescription("Friendly greeting"),
+  new SlashCommandBuilder()
+    .setName("info")
+    .setDescription("Information about this bot"),
+].map((c) => c.toJSON());
+
+// ── Event handlers ────────────────────────────────────────────────
+client.once(Events.ClientReady, async (c) => {
+  console.log(\`✅ \${c.user.tag} is online — serving \${c.guilds.cache.size} guild(s)\`);
+  try {
+    const rest = new REST({ version: "10" }).setToken(TOKEN);
+    await rest.put(Routes.applicationCommands(c.user.id), { body: commands });
+    console.log(\`📜 Registered \${commands.length} slash commands\`);
+  } catch (err) {
+    console.error("Failed to register commands:", err);
+  }
 });
 
-client.login(process.env.BOT_TOKEN);
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+  try {
+    if (interaction.commandName === "ping") {
+      await interaction.reply({
+        content: \`🏓 Pong! \${client.ws.ping}ms\`,
+        ephemeral: true,
+      });
+    } else if (interaction.commandName === "hello") {
+      await interaction.reply(\`👋 Hello \${interaction.user.username}!\`);
+    } else if (interaction.commandName === "info") {
+      const embed = new EmbedBuilder()
+        .setTitle("${name}")
+        .setDescription("Built with NexusOps · powered by Agent-4")
+        .setColor(0xf26207)
+        .addFields(
+          { name: "Servers", value: \`\${client.guilds.cache.size}\`, inline: true },
+          { name: "Latency", value: \`\${client.ws.ping}ms\`, inline: true },
+        )
+        .setTimestamp();
+      await interaction.reply({ embeds: [embed] });
+    }
+  } catch (err) {
+    console.error("Command error:", err);
+    if (!interaction.replied) {
+      await interaction.reply({ content: "❌ Something went wrong.", ephemeral: true }).catch(() => {});
+    }
+  }
+});
+
+client.on(Events.Error, (err) => console.error("Client error:", err));
+process.on("unhandledRejection", (err) => console.error("Unhandled rejection:", err));
+process.on("SIGTERM", () => { console.log("Shutting down..."); client.destroy(); process.exit(0); });
+
+client.login(TOKEN);
 `,
-  "discord-bot-python": (name) => `# ${name} — Discord bot (discord.py)
+  "discord-bot-python": (name) => `"""${name} — Discord bot (discord.py).
+
+Production-ready starter with slash commands, embeds, error handling.
+Set the BOT_TOKEN secret, then ask Agent-4 to add new commands or features.
+"""
+from __future__ import annotations
+
+import logging
 import os
+import sys
+
 import discord
+from discord import app_commands
+from discord.ext import commands
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+log = logging.getLogger("${name}")
+
+TOKEN = os.environ.get("BOT_TOKEN")
+if not TOKEN:
+    log.error("Missing BOT_TOKEN environment variable")
+    sys.exit(1)
 
 intents = discord.Intents.default()
-client = discord.Client(intents=intents)
+intents.message_content = True
 
-@client.event
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+
+@bot.event
 async def on_ready():
-    print(f"✅ {client.user} is online")
+    log.info("✅ %s is online — serving %d guild(s)", bot.user, len(bot.guilds))
+    try:
+        synced = await bot.tree.sync()
+        log.info("📜 Synced %d slash command(s)", len(synced))
+    except Exception:
+        log.exception("Failed to sync commands")
 
-client.run(os.environ["BOT_TOKEN"])
+
+@bot.tree.command(name="ping", description="Replies with latency")
+async def ping(interaction: discord.Interaction):
+    latency = round(bot.latency * 1000)
+    await interaction.response.send_message(f"🏓 Pong! {latency}ms", ephemeral=True)
+
+
+@bot.tree.command(name="hello", description="Friendly greeting")
+async def hello(interaction: discord.Interaction):
+    await interaction.response.send_message(f"👋 Hello {interaction.user.mention}!")
+
+
+@bot.tree.command(name="info", description="Information about this bot")
+async def info(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="${name}",
+        description="Built with NexusOps · powered by Agent-4",
+        color=0xF26207,
+    )
+    embed.add_field(name="Servers", value=str(len(bot.guilds)), inline=True)
+    embed.add_field(name="Latency", value=f"{round(bot.latency * 1000)}ms", inline=True)
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.event
+async def on_command_error(_ctx, error):
+    log.error("Command error: %s", error)
+
+
+if __name__ == "__main__":
+    bot.run(TOKEN, log_handler=None)
 `,
 };
+
+// Public-facing templates apply safeName before interpolation, neutralizing
+// HTML/JS/Python injection from a user-supplied project name.
+const STARTER_TEMPLATES: Record<string, (name: string) => string> = Object.fromEntries(
+  Object.entries(STARTER_TEMPLATES_RAW).map(([k, fn]) => [k, (name: string) => fn(safeName(name))]),
+);
 
 router.get("/bots/:id", (req, res): void => {
   const params = GetBotParams.safeParse(req.params);

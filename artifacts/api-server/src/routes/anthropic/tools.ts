@@ -218,13 +218,43 @@ export async function executeTool(
 
 /* ── Bot context for system prompt ─────────────────────────────────────── */
 
+const MAX_INLINE_FILE_CHARS = 6000;
+
+// Strip characters that could break out of the system-prompt structure
+// (markdown fences, XML tags, control chars). Keeps the agent's view honest.
+function sanitizeForPrompt(s: string): string {
+  return s.replace(/```/g, "ʼʼʼ").replace(/[\u0000-\u0008\u000b-\u001f]/g, "");
+}
+
 export function buildBotContext(botId: string | null): string {
   if (!botId) return "";
   const bot = getBot(botId);
   if (!bot) return "";
+
+  const projectType = bot.projectType ?? "discord-bot";
+  const safeBotName = sanitizeForPrompt(bot.name).slice(0, 120);
+  const safeFilename = sanitizeForPrompt(bot.filename).slice(0, 120);
+
+  const raw = getBotFileContent(botId);
+  let fileSection = "";
+  if (raw !== undefined) {
+    const truncated = raw.length > MAX_INLINE_FILE_CHARS;
+    const slice = truncated ? raw.slice(0, MAX_INLINE_FILE_CHARS) : raw;
+    const safeContent = sanitizeForPrompt(slice);
+    fileSection =
+      `\n\nCurrent contents of \`${safeFilename}\`` +
+      (truncated ? ` (first ${MAX_INLINE_FILE_CHARS} chars; call read_bot_file for the full file):` : ":") +
+      `\n<file>\n${safeContent}\n</file>`;
+  }
+
   return `\n\n---
-You are working on bot: "${bot.name}" (${bot.language}, status: ${bot.status}).
-Main file: "${bot.filename}". The bot runs in an isolated directory with its own node_modules/site-packages.
-Workflow: read_bot_file → write_bot_file → install_packages (if needed) → restart_bot → get_bot_logs.
+You are working on the project: "${safeBotName}".
+- Type: ${projectType}
+- Language: ${bot.language}
+- Status: ${bot.status}
+- Main file: ${safeFilename}
+- Isolated directory with its own node_modules/site-packages
+The current main-file contents are inlined below — treat them as the source of truth and only call read_bot_file if you need to verify changes you just wrote.
+Workflow: write_bot_file → install_packages (if needed) → restart_bot → get_bot_logs.${fileSection}
 ---`;
 }

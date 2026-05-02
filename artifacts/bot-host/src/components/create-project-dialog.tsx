@@ -100,7 +100,11 @@ export function CreateProjectDialog() {
       toast({ title: "✓", description: name.trim() });
       setOpen(false);
       reset();
-      navigate(`${basePath}/bots/${bot.id}/editor`);
+      const params = new URLSearchParams({
+        botId: String(bot.id),
+        botName: name.trim(),
+      });
+      navigate(`${basePath}/agent?${params.toString()}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error";
       toast({ title: "Error", description: msg, variant: "destructive" });
