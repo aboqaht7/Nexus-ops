@@ -210,7 +210,7 @@ router.post("/anthropic/conversations/:id/messages", async (req, res) => {
       const toolUseBlocks: Array<Anthropic.ToolUseBlock & { _inputStr?: string }> = [];
 
       const stream = anthropic.messages.stream({
-        model: "claude-sonnet-4-5",
+        model: "claude-opus-4-7",
         max_tokens: 8192,
         system: systemPrompt,
         tools: AGENT_TOOLS as unknown as Anthropic.Tool[],

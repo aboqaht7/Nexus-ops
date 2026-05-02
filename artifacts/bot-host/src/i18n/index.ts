@@ -12,8 +12,8 @@ import ja from "./locales/ja.json";
 import ru from "./locales/ru.json";
 
 export const SUPPORTED_LANGUAGES = [
-  { code: "ar", label: "العربية", flag: "🇸🇦", dir: "rtl" as const },
   { code: "en", label: "English", flag: "🇺🇸", dir: "ltr" as const },
+  { code: "ar", label: "العربية", flag: "🇸🇦", dir: "rtl" as const },
   { code: "es", label: "Español", flag: "🇪🇸", dir: "ltr" as const },
   { code: "fr", label: "Français", flag: "🇫🇷", dir: "ltr" as const },
   { code: "de", label: "Deutsch", flag: "🇩🇪", dir: "ltr" as const },
@@ -38,10 +38,12 @@ void i18n
       ja: { translation: ja },
       ru: { translation: ru },
     },
-    fallbackLng: "ar",
+    lng: undefined,
+    fallbackLng: "en",
     supportedLngs: SUPPORTED_LANGUAGES.map((l) => l.code),
+    load: "languageOnly",
     detection: {
-      order: ["localStorage", "navigator"],
+      order: ["localStorage", "navigator", "htmlTag"],
       caches: ["localStorage"],
       lookupLocalStorage: "nexusops-lang",
     },
