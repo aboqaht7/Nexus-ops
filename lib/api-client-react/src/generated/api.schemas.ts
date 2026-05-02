@@ -119,11 +119,37 @@ export interface AnthropicConversation {
   createdAt: string;
 }
 
+export type MessageAttachmentType =
+  (typeof MessageAttachmentType)[keyof typeof MessageAttachmentType];
+
+export const MessageAttachmentType = {
+  image: "image",
+} as const;
+
+export type MessageAttachmentMediaType =
+  (typeof MessageAttachmentMediaType)[keyof typeof MessageAttachmentMediaType];
+
+export const MessageAttachmentMediaType = {
+  "image/png": "image/png",
+  "image/jpeg": "image/jpeg",
+  "image/gif": "image/gif",
+  "image/webp": "image/webp",
+} as const;
+
+export interface MessageAttachment {
+  type: MessageAttachmentType;
+  mediaType: MessageAttachmentMediaType;
+  /** Base64-encoded payload (no data URI prefix) */
+  data: string;
+  name?: string;
+}
+
 export interface AnthropicMessage {
   id: number;
   conversationId: number;
   role: string;
   content: string;
+  attachments?: MessageAttachment[] | null;
   createdAt: string;
 }
 
@@ -134,6 +160,7 @@ export interface NewConversationBody {
 
 export interface NewMessageBody {
   content: string;
+  attachments?: MessageAttachment[];
 }
 
 export interface AnthropicConversationWithMessages {

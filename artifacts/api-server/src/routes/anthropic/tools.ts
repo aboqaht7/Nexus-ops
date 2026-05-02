@@ -1,5 +1,7 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
+import { readdirSync, readFileSync, writeFileSync, existsSync, statSync, mkdirSync, rmSync } from "fs";
+import { join, resolve, sep, dirname, relative } from "path";
 import {
   getBotFileContent,
   setBotFileContent,
@@ -14,6 +16,30 @@ import {
 import { logger } from "../../lib/logger.js";
 
 const execFileAsync = promisify(execFile);
+
+/* ── Path safety ────────────────────────────────────────────────────────── */
+
+const MAX_FILE_BYTES = 256 * 1024; // 256KB read/write limit
+const MAX_LIST_ENTRIES = 500;
+const IGNORE_DIRS = new Set(["node_modules", ".venv", "venv", "__pycache__", ".git", "dist", "build", ".next"]);
+
+/**
+ * Resolve a user-supplied relative path inside the bot's directory.
+ * Rejects absolute paths, `..` escapes, and anything resolving outside the bot dir.
+ */
+function safeResolve(botId: string, relPath: string): { ok: true; abs: string; root: string } | { ok: false; error: string } {
+  if (typeof relPath !== "string") return { ok: false, error: "path must be a string" };
+  const trimmed = relPath.trim().replace(/^\/+/, ""); // strip leading slashes
+  if (trimmed.includes("\0")) return { ok: false, error: "invalid path" };
+
+  const root = resolve(getBotDir(botId));
+  const rootWithSep = root.endsWith(sep) ? root : root + sep;
+  const abs = resolve(join(root, trimmed));
+  if (abs !== root && !abs.startsWith(rootWithSep)) {
+    return { ok: false, error: "Path escapes the project directory" };
+  }
+  return { ok: true, abs, root };
+}
 
 /* ── Tool definitions for Claude ────────────────────────────────────────── */
 
@@ -109,6 +135,66 @@ export const AGENT_TOOLS = [
       type: "object" as const,
       properties: {},
       required: [],
+    },
+  },
+  {
+    name: "list_files",
+    description: "List files and folders inside the project (recursive). Skips node_modules/.venv/.git. Use this to understand the project structure before editing.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        path: {
+          type: "string",
+          description: "Subdirectory inside the project, relative. Empty or '.' lists the project root.",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "read_file",
+    description: "Read any file inside the project by its relative path. Use this for files other than the main bot file (e.g. index.html, styles.css, package.json, additional source files).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        path: {
+          type: "string",
+          description: "Relative path inside the project (e.g. 'index.html', 'src/utils.js')",
+        },
+      },
+      required: ["path"],
+    },
+  },
+  {
+    name: "write_file",
+    description: "Create or overwrite ANY file inside the project at the given relative path. Creates parent directories as needed. Use this to build multi-file projects (HTML+CSS+JS, multi-route APIs, multi-module Python).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        path: {
+          type: "string",
+          description: "Relative path (e.g. 'styles.css', 'src/components/Header.jsx')",
+        },
+        content: {
+          type: "string",
+          description: "Full file contents to write.",
+        },
+      },
+      required: ["path", "content"],
+    },
+  },
+  {
+    name: "delete_file",
+    description: "Delete a file or empty directory inside the project. Use sparingly.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        path: {
+          type: "string",
+          description: "Relative path inside the project to delete.",
+        },
+      },
+      required: ["path"],
     },
   },
 ] as const;
@@ -209,6 +295,89 @@ export async function executeTool(
       const bot = startBot(botId);
       if (!bot) return "Error: Bot not found.";
       return `▶ Starting "${bot.name}"... Check get_bot_logs to confirm.`;
+    }
+
+    case "list_files": {
+      const sub = typeof input["path"] === "string" ? input["path"] : "";
+      const r = safeResolve(botId, sub);
+      if (!r.ok) return `Error: ${r.error}`;
+      if (!existsSync(r.abs)) return `Error: path does not exist: ${sub || "."}`;
+      const stat = statSync(r.abs);
+      if (!stat.isDirectory()) return `Error: not a directory: ${sub}`;
+
+      const out: string[] = [];
+      const walk = (dir: string, depth: number) => {
+        if (out.length >= MAX_LIST_ENTRIES || depth > 6) return;
+        let entries: string[];
+        try { entries = readdirSync(dir); } catch { return; }
+        for (const name of entries.sort()) {
+          if (out.length >= MAX_LIST_ENTRIES) { out.push("... (truncated)"); return; }
+          if (IGNORE_DIRS.has(name)) continue;
+          const full = join(dir, name);
+          let s; try { s = statSync(full); } catch { continue; }
+          const rel = relative(r.root, full).split(sep).join("/");
+          if (s.isDirectory()) {
+            out.push(`${rel}/`);
+            walk(full, depth + 1);
+          } else {
+            out.push(`${rel}  (${s.size} bytes)`);
+          }
+        }
+      };
+      walk(r.abs, 0);
+      return out.length === 0 ? "(empty directory)" : out.join("\n");
+    }
+
+    case "read_file": {
+      const p = input["path"];
+      if (typeof p !== "string" || !p.trim()) return "Error: path is required";
+      const r = safeResolve(botId, p);
+      if (!r.ok) return `Error: ${r.error}`;
+      if (!existsSync(r.abs)) return `Error: file does not exist: ${p}`;
+      const stat = statSync(r.abs);
+      if (stat.isDirectory()) return `Error: ${p} is a directory — use list_files instead.`;
+      if (stat.size > MAX_FILE_BYTES) return `Error: file too large (${stat.size} bytes, max ${MAX_FILE_BYTES})`;
+      try {
+        return readFileSync(r.abs, "utf-8");
+      } catch (e) {
+        return `Error reading file: ${(e as Error).message}`;
+      }
+    }
+
+    case "write_file": {
+      const p = input["path"];
+      const content = input["content"];
+      if (typeof p !== "string" || !p.trim()) return "Error: path is required";
+      if (typeof content !== "string") return "Error: content must be a string";
+      if (Buffer.byteLength(content, "utf-8") > MAX_FILE_BYTES) {
+        return `Error: content too large (max ${MAX_FILE_BYTES} bytes)`;
+      }
+      const r = safeResolve(botId, p);
+      if (!r.ok) return `Error: ${r.error}`;
+      try {
+        const parent = dirname(r.abs);
+        if (!existsSync(parent)) mkdirSync(parent, { recursive: true });
+        writeFileSync(r.abs, content, "utf-8");
+        const lines = content.split("\n").length;
+        return `✓ Wrote ${p} (${lines} lines, ${Buffer.byteLength(content, "utf-8")} bytes)`;
+      } catch (e) {
+        return `Error writing file: ${(e as Error).message}`;
+      }
+    }
+
+    case "delete_file": {
+      const p = input["path"];
+      if (typeof p !== "string" || !p.trim()) return "Error: path is required";
+      const r = safeResolve(botId, p);
+      if (!r.ok) return `Error: ${r.error}`;
+      if (r.abs === r.root) return "Error: cannot delete project root";
+      if (!existsSync(r.abs)) return `Error: ${p} does not exist`;
+      try {
+        rmSync(r.abs, { recursive: false, force: false });
+        return `✓ Deleted ${p}`;
+      } catch (e) {
+        return `Error deleting: ${(e as Error).message}`;
+      }
     }
 
     default:

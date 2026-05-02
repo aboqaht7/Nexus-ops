@@ -738,6 +738,25 @@ components:
         - title
         - createdAt
 
+    MessageAttachment:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [image]
+        mediaType:
+          type: string
+          enum: [image/png, image/jpeg, image/gif, image/webp]
+        data:
+          type: string
+          description: Base64-encoded payload (no data URI prefix)
+        name:
+          type: string
+      required:
+        - type
+        - mediaType
+        - data
+
     AnthropicMessage:
       type: object
       properties:
@@ -749,6 +768,11 @@ components:
           type: string
         content:
           type: string
+        attachments:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/MessageAttachment"
         createdAt:
           type: string
           format: date-time
@@ -775,6 +799,10 @@ components:
       properties:
         content:
           type: string
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/MessageAttachment"
       required:
         - content
 

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { eq, asc } from "drizzle-orm";
 import { db, conversations, messages } from "@workspace/db";
+import type { MessageAttachment } from "@workspace/db";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import {
   CreateAnthropicConversationBody,
@@ -8,6 +9,23 @@ import {
 } from "@workspace/api-zod";
 import { AGENT_TOOLS, executeTool, buildBotContext, type ToolName } from "./tools.js";
 import type Anthropic from "@anthropic-ai/sdk";
+
+const MAX_ATTACHMENTS = 5;
+const MAX_ATTACHMENT_BASE64_BYTES = 6 * 1024 * 1024; // ~4.5MB raw / per image
+
+function buildUserContent(text: string, attachments: MessageAttachment[] | null | undefined): Anthropic.MessageParam["content"] {
+  if (!attachments || attachments.length === 0) return text;
+  const blocks: Anthropic.ImageBlockParam[] = [];
+  for (const a of attachments.slice(0, MAX_ATTACHMENTS)) {
+    if (!a || a.type !== "image" || typeof a.data !== "string") continue;
+    blocks.push({
+      type: "image",
+      source: { type: "base64", media_type: a.mediaType, data: a.data },
+    });
+  }
+  if (blocks.length === 0) return text;
+  return [...blocks, { type: "text", text: text || "(see attached image)" }];
+}
 
 const router = Router();
 
@@ -18,15 +36,24 @@ const BASE_SYSTEM_PROMPT = `You are Agent-4, an elite autonomous full-stack engi
 ## Your real tools:
 - **read_bot_file** — Read the project's main source file (only when current contents are not already inlined in the project context)
 - **write_bot_file** — Write/overwrite the main source file
+- **list_files** — List all files in the project tree (skips node_modules/.git)
+- **read_file** — Read ANY file in the project by relative path (e.g. styles.css, src/utils.js, package.json)
+- **write_file** — Create or overwrite ANY file at a relative path (creates parent dirs). Use this for ALL multi-file projects.
+- **delete_file** — Delete a file inside the project
 - **install_packages** — Install npm/pip packages into the project's ISOLATED environment
-- **run_command** — Run any shell command inside the project's directory (create files, list, debug)
+- **run_command** — Run any shell command inside the project's directory (build, test, debug)
 - **get_bot_logs** — Read live stdout/stderr from the running process
 - **restart_bot** — Restart to apply code + package changes
 - **start_bot / stop_bot** — Start or stop the project process
 
+## VISION
+- The user MAY attach images (screenshots, mockups, designs) to messages. They are passed to you as image content blocks alongside the text.
+- When given an image, your job is to faithfully RECREATE it as a working website / web-app / game. Match the layout, colors, typography, spacing, components, and any visible text precisely.
+- Use list_files + write_file to build the recreated project (typically index.html + styles.css + script.js for static sites).
+
 ## Your autonomous workflow:
 1. **Read the inlined file in the project context** — that is the source of truth for the current state. Skip read_bot_file unless the context says it was truncated or you need to verify a write.
-2. **write_bot_file** — write the complete new/updated code
+2. **For multi-file work** — use list_files to understand the tree, then write_file/read_file for individual files.
 3. **install_packages** — install required libraries
 4. **restart_bot** — apply all changes
 5. **get_bot_logs** — confirm it started, check for errors
@@ -35,7 +62,7 @@ const BASE_SYSTEM_PROMPT = `You are Agent-4, an elite autonomous full-stack engi
 ## Rules:
 - You are AUTONOMOUS. Do not ask the user to do things you can do yourself.
 - Each project runs in its own isolated directory with its own node_modules / site-packages
-- For multi-file projects (HTML+CSS+JS, multi-route APIs), use \`run_command\` with \`cat > filename << 'EOF' ... EOF\` to create extra files
+- For multi-file projects PREFER write_file / read_file / list_files over run_command heredocs
 - After install_packages + restart_bot, check get_bot_logs to confirm no errors
 - Write clean, production-ready, well-commented code
 - Detect the user's language from their messages and respond in that language. Code and tool inputs always in English.`;
@@ -176,8 +203,23 @@ router.post("/anthropic/conversations/:id/messages", async (req, res) => {
   const [conv] = await db.select().from(conversations).where(eq(conversations.id, id));
   if (!conv) { res.status(404).json({ error: "Conversation not found" }); return; }
 
+  // Validate + sanitize attachments
+  const incomingAttachments: MessageAttachment[] = Array.isArray(body.attachments)
+    ? body.attachments.slice(0, MAX_ATTACHMENTS).filter(a =>
+        a && a.type === "image"
+        && typeof a.data === "string"
+        && a.data.length > 0
+        && a.data.length < MAX_ATTACHMENT_BASE64_BYTES * 1.4 // base64 overhead
+      ) as MessageAttachment[]
+    : [];
+
   // Save user message
-  await db.insert(messages).values({ conversationId: id, role: "user", content: body.content });
+  await db.insert(messages).values({
+    conversationId: id,
+    role: "user",
+    content: body.content,
+    attachments: incomingAttachments.length > 0 ? incomingAttachments : null,
+  });
 
   // Build message history
   const history = await db
@@ -195,10 +237,12 @@ router.post("/anthropic/conversations/:id/messages", async (req, res) => {
   const bot = botId ? getBot(botId) : undefined;
   const systemPrompt = buildSystemPrompt(bot?.projectType) + botContext;
 
-  const chatMessages: Anthropic.MessageParam[] = history.map(m => ({
-    role: m.role as "user" | "assistant",
-    content: m.content,
-  }));
+  const chatMessages: Anthropic.MessageParam[] = history.map(m => {
+    if (m.role === "user" && m.attachments && Array.isArray(m.attachments) && m.attachments.length > 0) {
+      return { role: "user", content: buildUserContent(m.content, m.attachments) };
+    }
+    return { role: m.role as "user" | "assistant", content: m.content };
+  });
 
   let fullAssistantText = "";
   const toolSummaries: string[] = [];

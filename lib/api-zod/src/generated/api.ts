@@ -319,6 +319,23 @@ export const GetAnthropicConversationResponse = zod.object({
       conversationId: zod.number(),
       role: zod.string(),
       content: zod.string(),
+      attachments: zod
+        .array(
+          zod.object({
+            type: zod.enum(["image"]),
+            mediaType: zod.enum([
+              "image/png",
+              "image/jpeg",
+              "image/gif",
+              "image/webp",
+            ]),
+            data: zod
+              .string()
+              .describe("Base64-encoded payload (no data URI prefix)"),
+            name: zod.string().optional(),
+          }),
+        )
+        .nullish(),
       createdAt: zod.coerce.date(),
     }),
   ),
@@ -343,6 +360,23 @@ export const ListAnthropicMessagesResponseItem = zod.object({
   conversationId: zod.number(),
   role: zod.string(),
   content: zod.string(),
+  attachments: zod
+    .array(
+      zod.object({
+        type: zod.enum(["image"]),
+        mediaType: zod.enum([
+          "image/png",
+          "image/jpeg",
+          "image/gif",
+          "image/webp",
+        ]),
+        data: zod
+          .string()
+          .describe("Base64-encoded payload (no data URI prefix)"),
+        name: zod.string().optional(),
+      }),
+    )
+    .nullish(),
   createdAt: zod.coerce.date(),
 });
 export const ListAnthropicMessagesResponse = zod.array(
@@ -358,6 +392,23 @@ export const SendAnthropicMessageParams = zod.object({
 
 export const SendAnthropicMessageBody = zod.object({
   content: zod.string(),
+  attachments: zod
+    .array(
+      zod.object({
+        type: zod.enum(["image"]),
+        mediaType: zod.enum([
+          "image/png",
+          "image/jpeg",
+          "image/gif",
+          "image/webp",
+        ]),
+        data: zod
+          .string()
+          .describe("Base64-encoded payload (no data URI prefix)"),
+        name: zod.string().optional(),
+      }),
+    )
+    .optional(),
 });
 
 /**

@@ -53,6 +53,11 @@ import {
   Play,
   Square,
   ScrollText,
+  ImageIcon,
+  Paperclip,
+  Trash2,
+  FolderTree,
+  ExternalLink,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -76,12 +81,52 @@ type StreamEvent =
 const TOOL_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
   read_bot_file:  { label: "قراءة ملف البوت", icon: <FileCode size={13} /> },
   write_bot_file: { label: "كتابة كود البوت", icon: <Code2 size={13} /> },
+  list_files:     { label: "تصفّح الملفات", icon: <FolderTree size={13} /> },
+  read_file:      { label: "قراءة ملف", icon: <FileCode size={13} /> },
+  write_file:     { label: "كتابة ملف", icon: <Code2 size={13} /> },
+  delete_file:    { label: "حذف ملف", icon: <Trash2 size={13} /> },
+  install_packages: { label: "تثبيت حزم", icon: <Terminal size={13} /> },
   run_command:    { label: "تشغيل أمر", icon: <Terminal size={13} /> },
   get_bot_logs:   { label: "قراءة اللوغات", icon: <ScrollText size={13} /> },
   restart_bot:    { label: "إعادة تشغيل البوت", icon: <RotateCw size={13} /> },
   start_bot:      { label: "تشغيل البوت", icon: <Play size={13} /> },
   stop_bot:       { label: "إيقاف البوت", icon: <Square size={13} /> },
 };
+
+type ImgMime = "image/png" | "image/jpeg" | "image/gif" | "image/webp";
+const ALLOWED_IMG_MIMES: readonly ImgMime[] = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024; // 4MB
+const MAX_ATTACHMENTS_UI = 5;
+
+interface PendingAttachment {
+  id: string;
+  name: string;
+  mediaType: ImgMime;
+  data: string; // base64 (no prefix)
+  preview: string; // data URL for thumbnail
+}
+
+function fileToAttachment(file: File): Promise<PendingAttachment | null> {
+  return new Promise((resolve) => {
+    if (!ALLOWED_IMG_MIMES.includes(file.type as ImgMime)) { resolve(null); return; }
+    if (file.size > MAX_ATTACHMENT_BYTES) { resolve(null); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result ?? "");
+      const comma = dataUrl.indexOf(",");
+      const data = comma >= 0 ? dataUrl.slice(comma + 1) : "";
+      resolve({
+        id: Math.random().toString(36).slice(2),
+        name: file.name,
+        mediaType: file.type as ImgMime,
+        data,
+        preview: dataUrl,
+      });
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
 
 interface ParsedSegment {
   type: "text" | "code";
@@ -315,6 +360,7 @@ interface MessageBubbleProps {
 function MessageBubble({ message, onDeploy }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const segments = parseMessage(message.content);
+  const attachments = (message as { attachments?: Array<{ mediaType: string; data: string; name?: string }> | null }).attachments;
 
   return (
     <div className={cn("flex gap-3 px-4 py-3", isUser ? "justify-end" : "justify-start")}>
@@ -331,7 +377,23 @@ function MessageBubble({ message, onDeploy }: MessageBubbleProps) {
           : "flex flex-col gap-1"
       )}>
         {isUser ? (
-          <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">{message.content}</p>
+          <div className="space-y-2">
+            {attachments && attachments.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {attachments.map((a, i) => (
+                  <img
+                    key={i}
+                    src={`data:${a.mediaType};base64,${a.data}`}
+                    alt={a.name ?? `attachment-${i}`}
+                    className="rounded-md border border-border/40 max-h-40 max-w-full object-contain bg-background"
+                  />
+                ))}
+              </div>
+            )}
+            {message.content && (
+              <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">{message.content}</p>
+            )}
+          </div>
         ) : (
           <div className="text-sm text-foreground/90">
             {segments.map((seg, i) =>
@@ -497,10 +559,13 @@ export default function AgentPage() {
   const [deployOpen, setDeployOpen] = useState(false);
   const [deployCode, setDeployCode] = useState({ code: "", lang: "" });
   const [input, setInput] = useState("");
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [streamingEvents, setStreamingEvents] = useState<StreamEvent[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const autoStarted = useRef(false);
 
@@ -565,10 +630,17 @@ export default function AgentPage() {
   };
 
   const handleSend = useCallback(async () => {
-    if (!input.trim() || !activeConvId || streaming) return;
+    if ((!input.trim() && pendingAttachments.length === 0) || !activeConvId || streaming) return;
 
     const message = input.trim();
+    const attachmentsToSend = pendingAttachments.map(a => ({
+      type: "image" as const,
+      mediaType: a.mediaType,
+      data: a.data,
+      name: a.name,
+    }));
     setInput("");
+    setPendingAttachments([]);
     setStreaming(true);
     setStreamingEvents([]);
 
@@ -580,7 +652,10 @@ export default function AgentPage() {
       const res = await fetch(`${BASE}/api/anthropic/conversations/${activeConvId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: message }),
+        body: JSON.stringify({
+          content: message,
+          ...(attachmentsToSend.length > 0 ? { attachments: attachmentsToSend } : {}),
+        }),
         signal: abort.signal,
       });
 
@@ -630,7 +705,52 @@ export default function AgentPage() {
       setStreaming(false);
       abortRef.current = null;
     }
-  }, [input, activeConvId, streaming, qc, toast]);
+  }, [input, pendingAttachments, activeConvId, streaming, qc, toast]);
+
+  const addFiles = useCallback(async (files: File[] | FileList) => {
+    const arr = Array.from(files);
+    const remaining = MAX_ATTACHMENTS_UI - pendingAttachments.length;
+    if (remaining <= 0) {
+      toast({ title: "الحد الأقصى للصور", description: `يمكن إرفاق ${MAX_ATTACHMENTS_UI} صور كحد أقصى.`, variant: "destructive" });
+      return;
+    }
+    let rejected = 0;
+    const accepted: PendingAttachment[] = [];
+    for (const f of arr.slice(0, remaining)) {
+      const att = await fileToAttachment(f);
+      if (att) accepted.push(att); else rejected++;
+    }
+    if (accepted.length > 0) setPendingAttachments(prev => [...prev, ...accepted]);
+    if (rejected > 0) {
+      toast({
+        title: "تم تجاهل بعض الملفات",
+        description: `الصور المسموحة: PNG, JPEG, GIF, WebP — أقل من 4MB.`,
+        variant: "destructive",
+      });
+    }
+  }, [pendingAttachments.length, toast]);
+
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const files: File[] = [];
+    for (const it of Array.from(items)) {
+      if (it.kind === "file") {
+        const f = it.getAsFile();
+        if (f) files.push(f);
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      void addFiles(files);
+    }
+  }, [addFiles]);
+
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer?.files?.length) void addFiles(e.dataTransfer.files);
+  }, [addFiles]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -782,7 +902,23 @@ export default function AgentPage() {
                     )}
                   </div>
                 </div>
-                {streaming && (() => {
+                <div className="flex items-center gap-2">
+                  {linkedBot && ["website", "game", "web-app"].includes(((linkedBot as unknown) as { projectType?: string }).projectType ?? "") && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 gap-1.5 text-xs"
+                      onClick={() => {
+                        const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+                        window.open(`${BASE}/api/preview/${linkedBot.id}`, "_blank", "noopener,noreferrer");
+                      }}
+                      title="افتح المعاينة المباشرة في نافذة جديدة"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      معاينة مباشرة
+                    </Button>
+                  )}
+                  {streaming && (() => {
                   const lastTool = [...streamingEvents].reverse().find(e => e.type === "tool_start" || e.type === "tool_running");
                   const isRunningTool = lastTool && !streamingEvents.find(e => e.type === "tool_result" && e.id === (lastTool as { id: string }).id);
                   const toolMeta = isRunningTool ? TOOL_LABELS[(lastTool as { name: string }).name] : null;
@@ -802,6 +938,7 @@ export default function AgentPage() {
                     </Badge>
                   );
                 })()}
+                </div>
               </div>
 
               <ScrollArea className="flex-1">
@@ -824,28 +961,81 @@ export default function AgentPage() {
                 </div>
               </ScrollArea>
 
-              <div className="px-4 pb-4 pt-2 border-t border-border/50 flex-shrink-0">
+              <div
+                className={cn(
+                  "px-4 pb-4 pt-2 border-t border-border/50 flex-shrink-0 transition-colors",
+                  isDragging && "bg-primary/5 ring-2 ring-primary/30 ring-inset"
+                )}
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+                onDrop={handleDrop}
+              >
+                {pendingAttachments.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {pendingAttachments.map(att => (
+                      <div key={att.id} className="relative group">
+                        <img
+                          src={att.preview}
+                          alt={att.name}
+                          className="h-16 w-16 object-cover rounded-md border border-border/50"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setPendingAttachments(prev => prev.filter(a => a.id !== att.id))}
+                          className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-90 hover:opacity-100 shadow"
+                          title="إزالة"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files?.length) void addFiles(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
                 <div className="flex gap-2 items-end">
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={streaming || pendingAttachments.length >= MAX_ATTACHMENTS_UI}
+                    className="flex-shrink-0 h-[60px] w-10"
+                    title="إرفاق صورة (يدعم اللصق والسحب والإفلات)"
+                  >
+                    <Paperclip className="w-4 h-4" />
+                  </Button>
                   <Textarea
                     ref={inputRef}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="صف بوتك، اطلب إصلاح الكود، أضف ميزات... (Enter للإرسال، Shift+Enter لسطر جديد)"
+                    onPaste={handlePaste}
+                    placeholder={isDragging ? "أفلت الصورة هنا..." : "صف ما تريد، أرفق صورة لإعادة بنائها، أصلح الأخطاء... (Enter للإرسال)"}
                     className="min-h-[60px] max-h-[160px] resize-none text-sm"
                     disabled={streaming}
                   />
                   <Button
                     size="icon"
                     onClick={handleSend}
-                    disabled={!input.trim() || streaming}
+                    disabled={(!input.trim() && pendingAttachments.length === 0) || streaming}
                     className="flex-shrink-0 h-[60px] w-10"
                   >
                     <Send className="w-4 h-4" />
                   </Button>
                 </div>
-                <p className="text-[10px] text-muted-foreground/50 mt-1.5 px-1">
-                  Agent-4 مدعوم بـ Claude Sonnet · قد تحتوي الردود على كود جاهز للنشر
+                <p className="text-[10px] text-muted-foreground/50 mt-1.5 px-1 flex items-center gap-1">
+                  <ImageIcon className="w-3 h-3" />
+                  أرسل صورة وسيعيد Agent-4 بناءها · مدعوم بـ Claude Opus 4
                 </p>
               </div>
             </>
