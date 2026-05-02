@@ -90,19 +90,6 @@ function getParams() {
   return { plan, billing };
 }
 
-/* ─── Detect Apple Pay support ───────────────────────────────────────── */
-function applePaySupported(): boolean {
-  try {
-    return !!(
-      window.ApplePaySession &&
-      window.ApplePaySession.supportsVersion(3) &&
-      window.ApplePaySession.canMakePayments()
-    );
-  } catch {
-    return false;
-  }
-}
-
 /* ─── Moyasar form sub-component — remounts on key change ───────────── */
 interface MoyasarFormProps {
   amount: number;
@@ -169,11 +156,9 @@ function MoyasarForm({ amount, description, planKey, billing, planName, accentCo
 
     initialized.current = true;
 
-    // Build allowed payment methods — only include Apple Pay if device supports it
-    const methods: string[] = ["creditcard", "stcpay"];
-    if (applePaySupported()) methods.unshift("applepay");
+    // Always include all methods — Moyasar SDK handles device detection itself
+    const methods = ["applepay", "creditcard", "stcpay"];
 
-    // Ensure callback URL uses current origin (HTTPS in production)
     const callbackUrl = `${window.location.origin}${base}/payment-success?plan=${planKey}&billing=${billing}`;
 
     const config: Record<string, unknown> = {
@@ -184,19 +169,15 @@ function MoyasarForm({ amount, description, planKey, billing, planName, accentCo
       publishable_api_key: MOYASAR_KEY,
       callback_url: callbackUrl,
       methods,
+      apple_pay: {
+        country: "SA",
+        label: planName,
+        validate_merchant_url: "https://api.moyasar.com/v1/applepay/initiate",
+      },
       on_failure: (error: unknown) => {
         console.error("Moyasar payment failure:", error);
       },
     };
-
-    // Add Apple Pay config only if supported
-    if (applePaySupported()) {
-      config.apple_pay = {
-        country: "SA",
-        label: planName,
-        validate_merchant_url: "https://api.moyasar.com/v1/applepay/initiate",
-      };
-    }
 
     try {
       window.Moyasar.init(config);
@@ -433,13 +414,6 @@ export default function Checkout() {
               accentColor={accentColor}
               accentLight={accentLight}
             />
-
-            {/* Apple Pay notice — only shown if NOT supported */}
-            {!applePaySupported() && (
-              <div style={{ marginTop: 12, padding: "8px 12px", background: "#FEF9EC", border: "1px solid #FDE68A", borderRadius: 8, fontSize: 11, color: "#92400E" }}>
-                💡 Apple Pay متاح فقط على Safari من أجهزة Apple
-              </div>
-            )}
 
             <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${R.border}` }}>
               <p style={{ fontSize: 11, color: R.muted, marginBottom: 10, textAlign: "center" }}>وسائل الدفع المقبولة</p>
