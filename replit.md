@@ -100,6 +100,14 @@ NexusOps — a comprehensive "build anything" platform like Replit. Build & host
 - Deploy endpoint: `POST /api/agent/deploy` creates a new bot from AI-generated code
 - Frontend: `/agent` page with sidebar conversation list, streaming chat, code block rendering, Deploy Bot button
 - System prompt specialized for Discord bot development (discord.js v14 + discord.py)
+- Tools: web_search, file mutations (read/write/list/create/delete), run_command, get_bot_logs, restart/start/stop_bot
+
+## Infrastructure (Replit-grade per project)
+
+- **Encrypted Secrets** — `lib/secrets.ts`. AES-256-GCM at rest using scrypt-derived master key from `SESSION_SECRET` (KDF salt pinned). File mode 0o600 enforced via tmp+rename. Lazy migration of legacy plain JSON. Hard-fails in production if `SESSION_SECRET` is missing/short. Endpoints: `GET/POST /api/bots/:id/secrets`, `DELETE /api/bots/:id/secrets/:key` — values never leak (only masked previews like `ab••••••••`). Bot auto-restarts when secrets change.
+- **Checkpoints** — `lib/checkpoints.ts`. Per-bot git versioning via `execFile` (no shell). Auto-commits after every Agent-4 turn that touches files; manual snapshots also supported. Endpoints: `GET/POST /api/bots/:id/checkpoints`, `POST /api/bots/:id/checkpoints/:sha/restore`. Restore creates a backup commit first, then `read-tree --reset -u` + commit. Hardened against malicious `.gitconfig` injection: `HOME=/tmp`, `GIT_CONFIG_GLOBAL=/dev/null`, `GIT_CONFIG_NOSYSTEM=1`. Author = `Agent-4 <agent-4@nexusops.local>`.
+- **Right-side IDE panel** in `/agent` has 4 tabs: Files (tree + Monaco viewer), Logs (live tail), Secrets (encrypted), Checkpoints (git history with one-click restore).
+- **Strict ownership** on all secrets/checkpoints endpoints: `bot.userId === requesting userId` (anonymous bots only manageable in fully-anonymous mode).
 
 ## Import / Export Features
 

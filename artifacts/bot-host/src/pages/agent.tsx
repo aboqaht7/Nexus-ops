@@ -63,6 +63,8 @@ import {
   Folder,
   FolderOpen,
   File as FileIcon,
+  Key,
+  History,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -668,8 +670,8 @@ export default function AgentPage() {
   const [streaming, setStreaming] = useState(false);
   const [streamingEvents, setStreamingEvents] = useState<StreamEvent[]>([]);
 
-  /* ── Right panel: files + logs ─────────────────────────────────────── */
-  const [rightTab, setRightTab] = useState<"files" | "logs">("files");
+  /* ── Right panel: files + logs + secrets + checkpoints ─────────────── */
+  const [rightTab, setRightTab] = useState<"files" | "logs" | "secrets" | "checkpoints">("files");
   const [fileTree, setFileTree] = useState<TreeNode[]>([]);
   const [treeLoading, setTreeLoading] = useState(false);
   const [openDirs, setOpenDirs] = useState<Set<string>>(new Set([""]));
@@ -679,6 +681,14 @@ export default function AgentPage() {
   const [contentError, setContentError] = useState<string | null>(null);
   const [recentlyTouched, setRecentlyTouched] = useState<Set<string>>(new Set());
   const [botLogs, setBotLogs] = useState<BotLogEntry[]>([]);
+  const [secrets, setSecrets] = useState<Array<{ key: string; preview: string; length: number }>>([]);
+  const [secretsLoading, setSecretsLoading] = useState(false);
+  const [newSecretKey, setNewSecretKey] = useState("");
+  const [newSecretValue, setNewSecretValue] = useState("");
+  const [secretError, setSecretError] = useState<string | null>(null);
+  const [checkpoints, setCheckpoints] = useState<Array<{ sha: string; shortSha: string; subject: string; createdAt: string; isAutomatic: boolean }>>([]);
+  const [checkpointsLoading, setCheckpointsLoading] = useState(false);
+  const [restoringSha, setRestoringSha] = useState<string | null>(null);
   const logScrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -754,6 +764,93 @@ export default function AgentPage() {
     } catch { /* ignore */ }
   }, []);
 
+  const fetchSecrets = useCallback(async (botId: string) => {
+    setSecretsLoading(true);
+    try {
+      const r = await fetch(`${apiBase()}/api/bots/${botId}/secrets`);
+      if (!r.ok) { setSecrets([]); return; }
+      const json = await r.json() as { secrets?: Array<{ key: string; preview: string; length: number }> };
+      setSecrets(json.secrets ?? []);
+    } catch { setSecrets([]); } finally { setSecretsLoading(false); }
+  }, []);
+
+  const fetchCheckpoints = useCallback(async (botId: string) => {
+    setCheckpointsLoading(true);
+    try {
+      const r = await fetch(`${apiBase()}/api/bots/${botId}/checkpoints`);
+      if (!r.ok) { setCheckpoints([]); return; }
+      const json = await r.json() as { checkpoints?: Array<{ sha: string; shortSha: string; subject: string; createdAt: string; isAutomatic: boolean }> };
+      setCheckpoints(json.checkpoints ?? []);
+    } catch { setCheckpoints([]); } finally { setCheckpointsLoading(false); }
+  }, []);
+
+  const handleAddSecret = useCallback(async () => {
+    if (!linkedBotId) return;
+    const key = newSecretKey.trim();
+    const value = newSecretValue;
+    if (!/^[A-Z_][A-Z0-9_]{0,63}$/.test(key)) {
+      setSecretError("المفتاح يبدأ بحرف كبير أو _ ، ويتكوّن من حروف كبيرة/أرقام/_");
+      return;
+    }
+    if (!value) { setSecretError("القيمة مطلوبة"); return; }
+    setSecretError(null);
+    try {
+      const r = await fetch(`${apiBase()}/api/bots/${linkedBotId}/secrets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value }),
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({})) as { error?: string };
+        setSecretError(j.error ?? `error ${r.status}`);
+        return;
+      }
+      setNewSecretKey(""); setNewSecretValue("");
+      void fetchSecrets(linkedBotId);
+    } catch (e) { setSecretError((e as Error).message); }
+  }, [linkedBotId, newSecretKey, newSecretValue, fetchSecrets]);
+
+  const handleDeleteSecret = useCallback(async (key: string) => {
+    if (!linkedBotId) return;
+    if (!window.confirm(`حذف ${key}؟`)) return;
+    try {
+      await fetch(`${apiBase()}/api/bots/${linkedBotId}/secrets/${encodeURIComponent(key)}`, { method: "DELETE" });
+      void fetchSecrets(linkedBotId);
+    } catch { /* ignore */ }
+  }, [linkedBotId, fetchSecrets]);
+
+  const handleManualCheckpoint = useCallback(async () => {
+    if (!linkedBotId) return;
+    const message = window.prompt("وصف نقطة الحفظ (اختياري):", "Manual snapshot");
+    if (message === null) return;
+    try {
+      await fetch(`${apiBase()}/api/bots/${linkedBotId}/checkpoints`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: message || "Manual snapshot" }),
+      });
+      void fetchCheckpoints(linkedBotId);
+    } catch { /* ignore */ }
+  }, [linkedBotId, fetchCheckpoints]);
+
+  const handleRestoreCheckpoint = useCallback(async (sha: string) => {
+    if (!linkedBotId) return;
+    if (!window.confirm("استعادة هذه النقطة؟ (سيتم حفظ نسخة احتياطية من الحالة الحالية تلقائياً)")) return;
+    setRestoringSha(sha);
+    try {
+      const r = await fetch(`${apiBase()}/api/bots/${linkedBotId}/checkpoints/${encodeURIComponent(sha)}/restore`, { method: "POST" });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({})) as { error?: string };
+        window.alert(j.error ?? `error ${r.status}`);
+        return;
+      }
+      void fetchCheckpoints(linkedBotId);
+      void fetchTree(linkedBotId);
+      if (selectedFile) void fetchFileContent(linkedBotId, selectedFile.path);
+    } catch (e) { window.alert((e as Error).message); }
+    finally { setRestoringSha(null); }
+  }, [linkedBotId, fetchCheckpoints, fetchTree, fetchFileContent, selectedFile]);
+
   // Initial tree load when conversation/bot changes
   useEffect(() => {
     if (linkedBotId) {
@@ -765,22 +862,33 @@ export default function AgentPage() {
     } else {
       setFileTree([]);
       setBotLogs([]);
+      setSecrets([]);
+      setCheckpoints([]);
     }
   }, [linkedBotId, fetchTree, fetchLogs]);
 
-  // Refresh tree after streaming ends + track touched files for highlight
+  // Lazy load secrets/checkpoints on tab switch
+  useEffect(() => {
+    if (!linkedBotId) return;
+    if (rightTab === "secrets") void fetchSecrets(linkedBotId);
+    if (rightTab === "checkpoints") void fetchCheckpoints(linkedBotId);
+  }, [rightTab, linkedBotId, fetchSecrets, fetchCheckpoints]);
+
+  // Refresh tree + checkpoints after streaming ends + track touched files for highlight
   const wasStreamingRef = useRef(false);
   useEffect(() => {
     if (wasStreamingRef.current && !streaming && linkedBotId) {
       void fetchTree(linkedBotId);
       void fetchLogs(linkedBotId);
+      // Auto-snapshot may have happened — refresh if visible
+      if (rightTab === "checkpoints") void fetchCheckpoints(linkedBotId);
       // Refresh selected file content if agent might have changed it
       if (selectedFile) {
         void fetchFileContent(linkedBotId, selectedFile.path);
       }
     }
     wasStreamingRef.current = streaming;
-  }, [streaming, linkedBotId, fetchTree, fetchLogs, fetchFileContent, selectedFile]);
+  }, [streaming, linkedBotId, rightTab, fetchTree, fetchLogs, fetchCheckpoints, fetchFileContent, selectedFile]);
 
   // Track files the agent just touched (highlight in tree)
   useEffect(() => {
@@ -1326,7 +1434,7 @@ export default function AgentPage() {
                 type="button"
                 onClick={() => setRightTab("logs")}
                 className={cn(
-                  "flex-1 px-3 py-2.5 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors",
+                  "flex-1 px-2 py-2.5 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors",
                   rightTab === "logs"
                     ? "bg-background text-foreground border-b-2 border-primary"
                     : "text-muted-foreground hover:text-foreground"
@@ -1338,9 +1446,35 @@ export default function AgentPage() {
                   <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                 )}
               </button>
+              <button
+                type="button"
+                onClick={() => setRightTab("secrets")}
+                className={cn(
+                  "flex-1 px-2 py-2.5 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors",
+                  rightTab === "secrets"
+                    ? "bg-background text-foreground border-b-2 border-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Key className="w-3.5 h-3.5" />
+                الأسرار
+              </button>
+              <button
+                type="button"
+                onClick={() => setRightTab("checkpoints")}
+                className={cn(
+                  "flex-1 px-2 py-2.5 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors",
+                  rightTab === "checkpoints"
+                    ? "bg-background text-foreground border-b-2 border-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <History className="w-3.5 h-3.5" />
+                الحفظ
+              </button>
             </div>
 
-            {rightTab === "files" ? (
+            {rightTab === "files" && (
               <div className="flex-1 flex flex-col min-h-0">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-border/30">
                   <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
@@ -1412,7 +1546,9 @@ export default function AgentPage() {
                   )}
                 </div>
               </div>
-            ) : (
+            )}
+
+            {rightTab === "logs" && (
               <div className="flex-1 flex flex-col min-h-0">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-border/30">
                   <div className="flex items-center gap-2">
@@ -1454,6 +1590,162 @@ export default function AgentPage() {
                             {new Date(l.timestamp).toLocaleTimeString("en-US", { hour12: false })}
                           </span>
                           <span className="whitespace-pre-wrap break-words">{l.message}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {rightTab === "secrets" && (
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-border/30">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                    متغيّرات البيئة
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => linkedBotId && void fetchSecrets(linkedBotId)}
+                    disabled={secretsLoading}
+                    className="text-muted-foreground hover:text-foreground p-0.5 rounded"
+                    title="تحديث"
+                  >
+                    <RefreshCw className={cn("w-3 h-3", secretsLoading && "animate-spin")} />
+                  </button>
+                </div>
+                <div className="px-3 py-2 border-b border-border/30 space-y-1.5 bg-background/40">
+                  <input
+                    type="text"
+                    placeholder="API_KEY"
+                    value={newSecretKey}
+                    onChange={e => setNewSecretKey(e.target.value.toUpperCase())}
+                    dir="ltr"
+                    className="w-full text-[11px] font-mono px-2 py-1 rounded border border-border/60 bg-background"
+                  />
+                  <input
+                    type="password"
+                    placeholder="القيمة (لن تظهر مرّة ثانية)"
+                    value={newSecretValue}
+                    onChange={e => setNewSecretValue(e.target.value)}
+                    dir="ltr"
+                    className="w-full text-[11px] font-mono px-2 py-1 rounded border border-border/60 bg-background"
+                  />
+                  {secretError && (
+                    <p className="text-[10px] text-destructive">{secretError}</p>
+                  )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void handleAddSecret()}
+                    disabled={!newSecretKey || !newSecretValue}
+                    className="w-full h-7 text-[11px]"
+                  >
+                    <Key className="w-3 h-3 me-1" />
+                    إضافة سر
+                  </Button>
+                  <p className="text-[9px] text-muted-foreground/60 leading-tight">
+                    الأسرار مشفّرة على القرص (AES-256-GCM) وتُحقن كـ env vars عند تشغيل البوت.
+                  </p>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  {secrets.length === 0 ? (
+                    <p className="px-3 py-6 text-xs text-muted-foreground/60 text-center">
+                      لا توجد أسرار بعد. أضف مفتاح API أو توكن.
+                    </p>
+                  ) : (
+                    <div className="py-1">
+                      {secrets.map(s => (
+                        <div key={s.key} className="flex items-center gap-2 px-3 py-1.5 border-b border-border/20 hover:bg-muted/30">
+                          <div className="flex-1 min-w-0" dir="ltr">
+                            <div className="text-[11px] font-mono font-medium truncate">{s.key}</div>
+                            <div className="text-[10px] text-muted-foreground/70 font-mono truncate">
+                              {s.preview} <span className="text-muted-foreground/40">({s.length})</span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteSecret(s.key)}
+                            className="flex-shrink-0 text-muted-foreground hover:text-destructive p-1 rounded"
+                            title="حذف"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {rightTab === "checkpoints" && (
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-border/30">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                    نقاط الحفظ
+                    {checkpoints.length > 0 && (
+                      <span className="ms-1 text-muted-foreground/60 normal-case">({checkpoints.length})</span>
+                    )}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => void handleManualCheckpoint()}
+                      className="text-muted-foreground hover:text-foreground p-0.5 rounded"
+                      title="حفظ الآن"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => linkedBotId && void fetchCheckpoints(linkedBotId)}
+                      disabled={checkpointsLoading}
+                      className="text-muted-foreground hover:text-foreground p-0.5 rounded"
+                      title="تحديث"
+                    >
+                      <RefreshCw className={cn("w-3 h-3", checkpointsLoading && "animate-spin")} />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  {checkpoints.length === 0 ? (
+                    <p className="px-3 py-6 text-xs text-muted-foreground/60 text-center">
+                      لا توجد نقاط حفظ بعد. ستُحفظ تلقائياً بعد كل دور للوكيل.
+                    </p>
+                  ) : (
+                    <div className="py-1">
+                      {checkpoints.map(c => (
+                        <div key={c.sha} className="px-3 py-2 border-b border-border/20 hover:bg-muted/30 group">
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 mb-0.5">
+                                <code className="text-[10px] text-muted-foreground/70 font-mono" dir="ltr">{c.shortSha}</code>
+                                {c.isAutomatic && (
+                                  <span className="text-[9px] px-1 py-px rounded bg-primary/10 text-primary/80">تلقائي</span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-foreground/85 truncate" title={c.subject}>
+                                {c.subject}
+                              </div>
+                              <div className="text-[9px] text-muted-foreground/60 mt-0.5" dir="ltr">
+                                {new Date(c.createdAt).toLocaleString("en-US", { hour12: false })}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => void handleRestoreCheckpoint(c.sha)}
+                              disabled={restoringSha !== null}
+                              className="flex-shrink-0 text-[10px] px-2 py-1 rounded bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50 transition-colors"
+                              title="استعادة"
+                            >
+                              {restoringSha === c.sha ? (
+                                <RotateCw className="w-3 h-3 animate-spin" />
+                              ) : (
+                                "استعادة"
+                              )}
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>

@@ -8,7 +8,18 @@ import {
   SendAnthropicMessageBody,
 } from "@workspace/api-zod";
 import { AGENT_TOOLS, executeTool, buildBotContext, type ToolName } from "./tools.js";
+import { snapshot as snapshotCheckpoint } from "../../lib/checkpoints.js";
+import { getBotDir } from "../../lib/bot-manager.js";
+import { logger } from "../../lib/logger.js";
 import type Anthropic from "@anthropic-ai/sdk";
+
+const FILE_MUTATING_TOOLS = new Set([
+  "write_bot_file",
+  "write_file",
+  "delete_file",
+  "install_packages",
+  "run_command",
+]);
 
 const MAX_ATTACHMENTS = 5;
 const MAX_ATTACHMENT_BASE64_BYTES = 6 * 1024 * 1024; // ~4.5MB raw / per image
@@ -46,6 +57,10 @@ const BASE_SYSTEM_PROMPT = `You are Agent-4, an elite autonomous full-stack engi
 - **restart_bot** — Restart to apply code + package changes
 - **start_bot / stop_bot** — Start or stop the project process
 - **web_search** — Search the live web (DuckDuckGo) for docs, library APIs, or current best practices BEFORE writing code you're unsure about
+
+## INFRASTRUCTURE the user has access to (you don't need tools for these — just inform the user):
+- **Secrets** — encrypted env vars (AES-256-GCM at rest), exposed to the running bot via process.env. User adds them in the right panel "الأسرار" tab. Use names like API_KEY, DISCORD_TOKEN, OPENAI_API_KEY.
+- **Checkpoints** — automatic git snapshots after every turn that mutates files. User can restore any past state in "الحفظ" tab. Encourage the user to make a manual checkpoint before risky changes.
 
 ## VISION
 - The user MAY attach images (screenshots, mockups, designs) to messages. They are passed to you as image content blocks alongside the text.
@@ -247,6 +262,7 @@ router.post("/anthropic/conversations/:id/messages", async (req, res) => {
 
   let fullAssistantText = "";
   const toolSummaries: string[] = [];
+  let touchedFiles = false;
 
   try {
     // Agentic loop — up to 10 iterations
@@ -312,6 +328,8 @@ router.post("/anthropic/conversations/:id/messages", async (req, res) => {
           output = `Error: ${(err as Error).message}`;
         }
 
+        if (FILE_MUTATING_TOOLS.has(toolName)) touchedFiles = true;
+
         sseWrite(res, { type: "tool_result", id: block.id, name: toolName, output });
         toolSummaries.push(`[${toolName}]: ${output.slice(0, 300)}`);
 
@@ -319,6 +337,17 @@ router.post("/anthropic/conversations/:id/messages", async (req, res) => {
       }
 
       chatMessages.push({ role: "user", content: toolResults });
+    }
+
+    // Auto-snapshot once per turn if any file-mutating tool ran
+    if (touchedFiles && botId) {
+      const subject = (body.content ?? "").trim().slice(0, 80) || "Agent turn";
+      try {
+        const sha = await snapshotCheckpoint(getBotDir(botId), subject, { isAutomatic: true, skipIfClean: true });
+        if (sha) sseWrite(res, { type: "checkpoint", sha, subject });
+      } catch (err) {
+        logger.warn({ botId, err: (err as Error).message }, "auto-checkpoint failed");
+      }
     }
 
     // Persist final assistant message

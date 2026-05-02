@@ -1,0 +1,9 @@
+node_modules/
+site-packages/
+.pythonlibs/
+__pycache__/
+*.pyc
+.replit/
+.replit-artifact/
+.DS_Store
+*.log

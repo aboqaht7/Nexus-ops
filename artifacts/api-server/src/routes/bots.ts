@@ -19,6 +19,18 @@ import {
   type BotLanguage,
   type ProjectType,
 } from "../lib/bot-manager.js";
+import {
+  listSecretsMasked,
+  setSecret,
+  deleteSecret,
+  isValidSecretKey,
+} from "../lib/secrets.js";
+import {
+  snapshot as snapshotCheckpoint,
+  listCheckpoints,
+  restoreCheckpoint,
+  isValidSha,
+} from "../lib/checkpoints.js";
 import { getUserLimits } from "../lib/subscriptions.js";
 import {
   ListBotsResponse,
@@ -1266,6 +1278,116 @@ router.get("/bots/:id/files/content", (req, res): void => {
     res.json({ id, path: trimmed, size: s.size, ext, content });
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });
+  }
+});
+
+/* ── Secrets (encrypted env vars) ─────────────────────────────────────────── */
+
+// Strict ownership: bot.userId must equal request userId. Anonymous bots
+// (no userId) are only manageable in fully-anonymous mode (no auth at all).
+function isAuthorized(bot: { userId?: string }, userId: string | undefined): boolean {
+  return (bot.userId ?? null) === (userId ?? null);
+}
+
+router.get("/bots/:id/secrets", (req, res): void => {
+  const id = req.params["id"];
+  if (typeof id !== "string" || !id) { res.status(400).json({ error: "id required" }); return; }
+  const bot = getBot(id);
+  if (!bot) { res.status(404).json({ error: "Bot not found" }); return; }
+  if (!isAuthorized(bot, getUserId(req))) { res.status(403).json({ error: "Forbidden" }); return; }
+  res.json({ id, secrets: listSecretsMasked(id) });
+});
+
+router.post("/bots/:id/secrets", (req, res): void => {
+  const id = req.params["id"];
+  if (typeof id !== "string" || !id) { res.status(400).json({ error: "id required" }); return; }
+  const bot = getBot(id);
+  if (!bot) { res.status(404).json({ error: "Bot not found" }); return; }
+  if (!isAuthorized(bot, getUserId(req))) { res.status(403).json({ error: "Forbidden" }); return; }
+  const body = req.body as { key?: unknown; value?: unknown } | undefined;
+  const key = body?.key;
+  const value = body?.value;
+  if (!isValidSecretKey(key)) { res.status(400).json({ error: "Invalid key — uppercase letters/digits/_, must start with letter or _" }); return; }
+  if (typeof value !== "string") { res.status(400).json({ error: "value must be string" }); return; }
+  try {
+    setSecret(id, key, value);
+    let restartError: string | null = null;
+    if (bot.status === "running") {
+      try { restartBot(id); } catch (e) { restartError = (e as Error).message; }
+    }
+    res.json({ id, key, restarted: bot.status === "running" && !restartError, ...(restartError ? { restartError } : {}) });
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+router.delete("/bots/:id/secrets/:key", (req, res): void => {
+  const id = req.params["id"];
+  const key = req.params["key"];
+  if (typeof id !== "string" || !id || typeof key !== "string" || !key) { res.status(400).json({ error: "id and key required" }); return; }
+  const bot = getBot(id);
+  if (!bot) { res.status(404).json({ error: "Bot not found" }); return; }
+  if (!isAuthorized(bot, getUserId(req))) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (!isValidSecretKey(key)) { res.status(400).json({ error: "Invalid key" }); return; }
+  const removed = deleteSecret(id, key);
+  if (!removed) { res.status(404).json({ error: "Secret not found" }); return; }
+  let restartError: string | null = null;
+  if (bot.status === "running") {
+    try { restartBot(id); } catch (e) { restartError = (e as Error).message; }
+  }
+  res.json({ id, key, removed: true, ...(restartError ? { restartError } : {}) });
+});
+
+/* ── Checkpoints (git versioning + rollback) ──────────────────────────────── */
+
+router.get("/bots/:id/checkpoints", async (req, res): Promise<void> => {
+  const id = req.params["id"];
+  if (typeof id !== "string" || !id) { res.status(400).json({ error: "id required" }); return; }
+  const bot = getBot(id);
+  if (!bot) { res.status(404).json({ error: "Bot not found" }); return; }
+  if (!isAuthorized(bot, getUserId(req))) { res.status(403).json({ error: "Forbidden" }); return; }
+  try {
+    const checkpoints = await listCheckpoints(getBotDir(id));
+    res.json({ id, count: checkpoints.length, checkpoints });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.post("/bots/:id/checkpoints", async (req, res): Promise<void> => {
+  const id = req.params["id"];
+  if (typeof id !== "string" || !id) { res.status(400).json({ error: "id required" }); return; }
+  const bot = getBot(id);
+  if (!bot) { res.status(404).json({ error: "Bot not found" }); return; }
+  if (!isAuthorized(bot, getUserId(req))) { res.status(403).json({ error: "Forbidden" }); return; }
+  const body = req.body as { message?: unknown } | undefined;
+  const message = typeof body?.message === "string" && body.message.trim()
+    ? body.message
+    : "Manual snapshot";
+  try {
+    const sha = await snapshotCheckpoint(getBotDir(id), message, { isAutomatic: false, skipIfClean: false });
+    res.json({ id, sha, message });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+router.post("/bots/:id/checkpoints/:sha/restore", async (req, res): Promise<void> => {
+  const id = req.params["id"];
+  const sha = req.params["sha"];
+  if (typeof id !== "string" || !id) { res.status(400).json({ error: "id required" }); return; }
+  if (!isValidSha(sha)) { res.status(400).json({ error: "Invalid sha" }); return; }
+  const bot = getBot(id);
+  if (!bot) { res.status(404).json({ error: "Bot not found" }); return; }
+  if (!isAuthorized(bot, getUserId(req))) { res.status(403).json({ error: "Forbidden" }); return; }
+  try {
+    const result = await restoreCheckpoint(getBotDir(id), sha);
+    if (bot.status === "running") {
+      try { restartBot(id); } catch { /* non-fatal */ }
+    }
+    res.json({ id, ...result, restarted: bot.status === "running" });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
   }
 });
 

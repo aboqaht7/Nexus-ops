@@ -11,6 +11,7 @@ import {
 import { join, extname } from "path";
 import { randomUUID } from "crypto";
 import { logger } from "./logger.js";
+import { readSecrets, writeSecrets } from "./secrets.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -355,17 +356,15 @@ export function setBotFileContent(id: string, content: string): boolean {
   return true;
 }
 
-/* ── Env var helpers ─────────────────────────────────────────────────────── */
+/* ── Env var helpers (encrypted at rest via secrets.ts) ───────────────────── */
 
 export function getBotEnv(id: string): Record<string, string> {
-  const path = join(BOT_ENVS_DIR, `${id}.json`);
-  if (!existsSync(path)) return {};
-  try { return JSON.parse(readFileSync(path, "utf-8")); } catch { return {}; }
+  return readSecrets(id);
 }
 
 export function setBotEnv(id: string, vars: Record<string, string>): void {
   ensureDirs();
-  writeFileSync(join(BOT_ENVS_DIR, `${id}.json`), JSON.stringify(vars, null, 2), "utf-8");
+  writeSecrets(id, vars);
 }
 
 /* ── Package installation ─────────────────────────────────────────────────── */
