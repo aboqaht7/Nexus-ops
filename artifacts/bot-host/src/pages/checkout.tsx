@@ -13,11 +13,27 @@ declare global {
 }
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
-const MOYASAR_KEY = (
-  (import.meta.env.VITE_MOYASAR_PUBLISHABLE_KEY as string | undefined) ||
-  (import.meta.env.VITE_MOYASAR_TEST_KEY as string | undefined) ||
-  ""
-);
+
+const PUBLISHABLE_KEY = (import.meta.env.VITE_MOYASAR_PUBLISHABLE_KEY as string | undefined) || "";
+const TEST_KEY = (import.meta.env.VITE_MOYASAR_TEST_KEY as string | undefined) || "";
+
+function isDevHost(): boolean {
+  if (typeof window === "undefined") return false;
+  const h = window.location.hostname;
+  return (
+    h.endsWith(".replit.dev") ||
+    h.endsWith(".repl.co") ||
+    h === "localhost" ||
+    h === "127.0.0.1"
+  );
+}
+
+function pickMoyasarKey(): string {
+  if (isDevHost() && TEST_KEY) return TEST_KEY;
+  return PUBLISHABLE_KEY || TEST_KEY || "";
+}
+
+const MOYASAR_KEY = pickMoyasarKey();
 
 const R = {
   bg: "#FAF7F2",
@@ -154,6 +170,14 @@ function MoyasarForm({ amount, description, planKey, billing, planName, accentCo
 
     const callbackUrl = `${window.location.origin}${base}/payment-success?plan=${planKey}&billing=${billing}`;
 
+    const dev = isDevHost();
+    // Apple Pay requires a Moyasar-registered merchant domain + Apple's domain-association file.
+    // On Replit dev hosts (or any non-registered domain) Apple Pay validation fails silently
+    // and the entire form gets stuck on "Loading". So we exclude it on dev hosts.
+    // STC Pay similarly needs to be enabled per-merchant — keep it only in production where
+    // the merchant account is verified. On dev, default to credit card only.
+    const methods = dev ? ["creditcard"] : ["applepay", "creditcard", "stcpay"];
+
     const config: Record<string, unknown> = {
       element: `#${formId}`,
       amount,
@@ -168,16 +192,28 @@ function MoyasarForm({ amount, description, planKey, billing, planName, accentCo
         plan: planKey,
         billing,
       },
-      methods: ["applepay", "creditcard", "stcpay"],
-      apple_pay: {
-        country: "SA",
-        label: planName,
-        validate_merchant_url: "https://api.moyasar.com/v1/applepay/initiate",
-      },
+      methods,
       on_failure: (error: unknown) => {
         console.error("Moyasar payment failure:", error);
       },
     };
+
+    if (!dev) {
+      config.apple_pay = {
+        country: "SA",
+        label: planName,
+        validate_merchant_url: "https://api.moyasar.com/v1/applepay/initiate",
+      };
+    }
+
+    if (dev) {
+      console.info(
+        "[Moyasar] init",
+        "key=" + MOYASAR_KEY.slice(0, 8) + "…",
+        "host=" + window.location.hostname,
+        "methods=" + methods.join(","),
+      );
+    }
 
     try {
       window.Moyasar.init(config);
