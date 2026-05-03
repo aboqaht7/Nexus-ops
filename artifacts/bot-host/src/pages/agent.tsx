@@ -71,6 +71,7 @@ import {
   Smartphone,
   Tablet,
   Monitor,
+  Database,
 } from "lucide-react";
 import Editor from "@monaco-editor/react";
 import { useToast } from "@/hooks/use-toast";
@@ -701,7 +702,7 @@ export default function AgentPage() {
   const [streamingEvents, setStreamingEvents] = useState<StreamEvent[]>([]);
 
   /* ── Right panel: files + logs + secrets + checkpoints + preview ───── */
-  const [rightTab, setRightTab] = useState<"files" | "logs" | "secrets" | "checkpoints" | "preview">("files");
+  const [rightTab, setRightTab] = useState<"files" | "logs" | "secrets" | "checkpoints" | "preview" | "kv">("files");
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
   const [previewKey, setPreviewKey] = useState(0);
   const [fileTree, setFileTree] = useState<TreeNode[]>([]);
@@ -736,6 +737,15 @@ export default function AgentPage() {
 
   /* ── Cost / usage ───────────────────────────────────────────────────── */
   const [usage, setUsage] = useState<{ inputTokens: number; outputTokens: number; costSar: number; costUsd: number } | null>(null);
+
+  /* ── KV store ───────────────────────────────────────────────────────── */
+  const [kvEntries, setKvEntries] = useState<Array<{ key: string; value: string; updatedAt: number }>>([]);
+  const [kvTotal, setKvTotal] = useState(0);
+  const [kvLoading, setKvLoading] = useState(false);
+  const [kvPrefix, setKvPrefix] = useState("");
+  const [newKvKey, setNewKvKey] = useState("");
+  const [newKvValue, setNewKvValue] = useState("");
+  const [kvError, setKvError] = useState<string | null>(null);
   const logScrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -985,12 +995,79 @@ export default function AgentPage() {
     }
   }, [linkedBotId, fetchTree, fetchLogs]);
 
-  // Lazy load secrets/checkpoints on tab switch
+  // Lazy load secrets/checkpoints/kv on tab switch
+  const fetchKv = useCallback(async (botId: string, prefix = "") => {
+    setKvLoading(true);
+    setKvError(null);
+    try {
+      const qs = prefix ? `?prefix=${encodeURIComponent(prefix)}&limit=200` : `?limit=200`;
+      const res = await fetch(`/api/bots/${botId}/kv${qs}`, { credentials: "include" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setKvEntries(data.entries || []);
+      setKvTotal(data.total || 0);
+    } catch (err) {
+      setKvError((err as Error).message);
+      setKvEntries([]);
+      setKvTotal(0);
+    } finally {
+      setKvLoading(false);
+    }
+  }, []);
+
+  const handleAddKv = useCallback(async () => {
+    if (!linkedBotId || !newKvKey.trim()) return;
+    setKvError(null);
+    try {
+      // Stored value is JSON-text (compatible with nexusdb.js / nexusdb.py helpers).
+      // If the user typed valid JSON, keep it as-is; otherwise wrap as JSON string.
+      let stored: string;
+      const trimmed = newKvValue.trim();
+      try {
+        if (trimmed === "") {
+          stored = JSON.stringify("");
+        } else {
+          JSON.parse(trimmed);
+          stored = trimmed;
+        }
+      } catch {
+        stored = JSON.stringify(newKvValue);
+      }
+      const res = await fetch(`/api/bots/${linkedBotId}/kv/${encodeURIComponent(newKvKey.trim())}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ value: stored }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || `HTTP ${res.status}`);
+      }
+      setNewKvKey("");
+      setNewKvValue("");
+      void fetchKv(linkedBotId, kvPrefix);
+    } catch (err) {
+      setKvError((err as Error).message);
+    }
+  }, [linkedBotId, newKvKey, newKvValue, kvPrefix, fetchKv]);
+
+  const handleDeleteKv = useCallback(async (key: string) => {
+    if (!linkedBotId) return;
+    try {
+      await fetch(`/api/bots/${linkedBotId}/kv/${encodeURIComponent(key)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      void fetchKv(linkedBotId, kvPrefix);
+    } catch { /* ignore */ }
+  }, [linkedBotId, kvPrefix, fetchKv]);
+
   useEffect(() => {
     if (!linkedBotId) return;
     if (rightTab === "secrets") void fetchSecrets(linkedBotId);
     if (rightTab === "checkpoints") void fetchCheckpoints(linkedBotId);
-  }, [rightTab, linkedBotId, fetchSecrets, fetchCheckpoints]);
+    if (rightTab === "kv") void fetchKv(linkedBotId, kvPrefix);
+  }, [rightTab, linkedBotId, fetchSecrets, fetchCheckpoints, fetchKv, kvPrefix]);
 
   // Sync editor when the user switches files (always reset on path change).
   // When fileContent updates while user is editing the SAME file, preserve their edits.
@@ -1662,6 +1739,23 @@ export default function AgentPage() {
                 <History className="w-3.5 h-3.5" />
                 الحفظ
               </button>
+              <button
+                type="button"
+                onClick={() => setRightTab("kv")}
+                className={cn(
+                  "flex-1 px-2 py-2.5 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors",
+                  rightTab === "kv"
+                    ? "bg-background text-foreground border-b-2 border-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                title="قاعدة بيانات key-value للبوت"
+              >
+                <Database className="w-3.5 h-3.5" />
+                قاعدة البيانات
+                {kvTotal > 0 && (
+                  <span className="text-[10px] text-muted-foreground/60">({kvTotal})</span>
+                )}
+              </button>
               {linkedBotForPanel && ["website", "game", "web-app"].includes(((linkedBotForPanel as unknown) as { projectType?: string }).projectType ?? "") && (
                 <button
                   type="button"
@@ -1993,6 +2087,110 @@ export default function AgentPage() {
                               )}
                             </button>
                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {rightTab === "kv" && linkedBotForPanel && (
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-border/30">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                    NexusDB · key/value
+                    {kvTotal > 0 && (
+                      <span className="ms-1 text-muted-foreground/60 normal-case">({kvTotal})</span>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => linkedBotId && void fetchKv(linkedBotId, kvPrefix)}
+                    disabled={kvLoading}
+                    className="text-muted-foreground hover:text-foreground p-0.5 rounded"
+                    title="تحديث"
+                  >
+                    <RefreshCw className={cn("w-3 h-3", kvLoading && "animate-spin")} />
+                  </button>
+                </div>
+                <div className="px-3 py-2 border-b border-border/30 space-y-1.5 bg-background/40">
+                  <input
+                    type="text"
+                    placeholder="بحث بالبادئة (prefix)…"
+                    value={kvPrefix}
+                    onChange={e => setKvPrefix(e.target.value)}
+                    dir="ltr"
+                    className="w-full text-[11px] font-mono px-2 py-1 rounded border border-border/60 bg-background"
+                  />
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      placeholder="key"
+                      value={newKvKey}
+                      onChange={e => setNewKvKey(e.target.value)}
+                      dir="ltr"
+                      className="flex-1 text-[11px] font-mono px-2 py-1 rounded border border-border/60 bg-background"
+                    />
+                    <input
+                      type="text"
+                      placeholder='"value" أو {"j":"son"}'
+                      value={newKvValue}
+                      onChange={e => setNewKvValue(e.target.value)}
+                      dir="ltr"
+                      className="flex-1 text-[11px] font-mono px-2 py-1 rounded border border-border/60 bg-background"
+                    />
+                  </div>
+                  {kvError && (
+                    <p className="text-[10px] text-destructive">{kvError}</p>
+                  )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void handleAddKv()}
+                    disabled={!newKvKey.trim()}
+                    className="w-full h-7 text-[11px]"
+                  >
+                    <Database className="w-3 h-3 me-1" />
+                    حفظ
+                  </Button>
+                  <p className="text-[9px] text-muted-foreground/60 leading-tight">
+                    البوت يستخدمها عبر <code className="font-mono">require('./nexusdb')</code> أو <code className="font-mono">import nexusdb</code>. مخزّنة في SQLite معزول لكل بوت.
+                  </p>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  {kvEntries.length === 0 ? (
+                    <p className="px-3 py-6 text-xs text-muted-foreground/60 text-center">
+                      {kvLoading ? "جاري التحميل…" : "لا توجد مفاتيح بعد. اكتب من البوت أو من هنا."}
+                    </p>
+                  ) : (
+                    <div className="py-1">
+                      {kvEntries.map(e => (
+                        <div key={e.key} className="flex items-start gap-2 px-3 py-1.5 border-b border-border/20 hover:bg-muted/30">
+                          <div className="flex-1 min-w-0" dir="ltr">
+                            <div className="text-[11px] font-mono font-medium truncate">{e.key}</div>
+                            <div className="text-[10px] text-muted-foreground/70 font-mono break-all line-clamp-2">
+                              {(() => {
+                                let pretty = e.value;
+                                try {
+                                  const parsed = JSON.parse(e.value);
+                                  pretty = typeof parsed === "string" ? parsed : JSON.stringify(parsed);
+                                } catch { /* show raw */ }
+                                return pretty.length > 200 ? pretty.slice(0, 200) + "…" : pretty;
+                              })()}
+                            </div>
+                            <div className="text-[9px] text-muted-foreground/40">
+                              {new Date(e.updatedAt).toLocaleString("ar-SA")}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteKv(e.key)}
+                            className="flex-shrink-0 text-muted-foreground hover:text-destructive p-1 rounded"
+                            title="حذف"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
                         </div>
                       ))}
                     </div>

@@ -7,10 +7,12 @@ import {
   mkdirSync,
   renameSync,
   readdirSync,
+  rmSync,
 } from "fs";
 import { join, extname } from "path";
-import { randomUUID } from "crypto";
+import { randomUUID, randomBytes } from "crypto";
 import { logger } from "./logger.js";
+import { kvClose, kvDbPath } from "./kv-store.js";
 import { readSecrets, writeSecrets } from "./secrets.js";
 
 const execFileAsync = promisify(execFile);
@@ -19,6 +21,7 @@ const DATA_DIR = join(process.cwd(), "data");
 const BOTS_FILE = join(DATA_DIR, "bots.json");
 const BOT_FILES_DIR = join(DATA_DIR, "bot-files");
 const BOT_ENVS_DIR = join(DATA_DIR, "bot-envs");
+const BOT_KV_TOKENS_FILE = join(DATA_DIR, "bot-kv-tokens.json");
 const MAX_LOG_ENTRIES = 1000;
 const MAX_RESTART_DELAY_MS = 30_000;
 
@@ -195,6 +198,170 @@ function ensureRequirementsTxt(bot: BotRecord) {
   }
 }
 
+/* ── KV store (per-bot token + helper files) ──────────────────────────────── */
+
+function loadKvTokens(): Record<string, string> {
+  ensureDirs();
+  if (!existsSync(BOT_KV_TOKENS_FILE)) return {};
+  try { return JSON.parse(readFileSync(BOT_KV_TOKENS_FILE, "utf-8")); }
+  catch { return {}; }
+}
+
+function saveKvTokens(map: Record<string, string>): void {
+  ensureDirs();
+  writeFileSync(BOT_KV_TOKENS_FILE, JSON.stringify(map, null, 2), "utf-8");
+}
+
+export function getBotKvToken(botId: string): string | undefined {
+  return loadKvTokens()[botId];
+}
+
+export function ensureBotKvToken(botId: string): string {
+  const map = loadKvTokens();
+  if (!map[botId]) {
+    map[botId] = randomBytes(24).toString("hex");
+    saveKvTokens(map);
+  }
+  return map[botId];
+}
+
+export function deleteBotKvToken(botId: string): void {
+  const map = loadKvTokens();
+  if (map[botId]) {
+    delete map[botId];
+    saveKvTokens(map);
+  }
+}
+
+function getKvBaseUrl(botId: string): string {
+  const port = process.env.PORT || "8080";
+  return `http://127.0.0.1:${port}/api/internal/kv/${botId}`;
+}
+
+const NEXUSDB_JS = `// NexusOps KV store helper (auto-generated, do not edit)
+// Usage:
+//   const db = require('./nexusdb');
+//   await db.set('user:1', { name: 'Ali' });
+//   const u = await db.get('user:1');
+//   await db.list('user:');
+//   await db.delete('user:1');
+const URL = process.env.BOT_KV_URL;
+const TOKEN = process.env.BOT_KV_TOKEN;
+function check() {
+  if (!URL || !TOKEN) throw new Error('NexusDB unavailable: BOT_KV_URL/BOT_KV_TOKEN missing');
+}
+async function req(method, path, body) {
+  check();
+  const res = await fetch(URL + path, {
+    method,
+    headers: { 'content-type': 'application/json', 'x-bot-kv-token': TOKEN },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await res.text();
+  const json = text ? JSON.parse(text) : null;
+  if (!res.ok) throw new Error('NexusDB ' + res.status + ': ' + (json?.error || text));
+  return json;
+}
+function enc(k) { return encodeURIComponent(k); }
+module.exports = {
+  async get(key) {
+    try { const r = await req('GET', '/' + enc(key)); return JSON.parse(r.value); }
+    catch (e) { if (String(e.message).includes(' 404')) return null; throw e; }
+  },
+  async set(key, value) {
+    return req('PUT', '/' + enc(key), { value: JSON.stringify(value) });
+  },
+  async delete(key) {
+    const r = await req('DELETE', '/' + enc(key));
+    return !!r.deleted;
+  },
+  async list(prefix = '', { limit = 100, offset = 0 } = {}) {
+    const qs = new URLSearchParams({ prefix, limit: String(limit), offset: String(offset) });
+    const r = await req('GET', '?' + qs);
+    return { entries: r.entries.map(e => ({ key: e.key, value: JSON.parse(e.value), updatedAt: e.updatedAt })), total: r.total };
+  },
+};
+`;
+
+const NEXUSDB_PY = `"""NexusOps KV store helper (auto-generated, do not edit).
+
+Usage:
+    import nexusdb as db
+    db.set("user:1", {"name": "Ali"})
+    db.get("user:1")
+    db.list("user:")
+    db.delete("user:1")
+"""
+import json
+import os
+import urllib.error
+import urllib.parse
+import urllib.request
+
+_URL = os.environ.get("BOT_KV_URL")
+_TOKEN = os.environ.get("BOT_KV_TOKEN")
+
+
+def _req(method: str, path: str, body=None):
+    if not _URL or not _TOKEN:
+        raise RuntimeError("NexusDB unavailable: BOT_KV_URL/BOT_KV_TOKEN missing")
+    data = None if body is None else json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(
+        _URL + path, data=data, method=method,
+        headers={"content-type": "application/json", "x-bot-kv-token": _TOKEN},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            raw = resp.read().decode("utf-8")
+            return json.loads(raw) if raw else None
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        msg = e.read().decode("utf-8", "ignore")
+        raise RuntimeError(f"NexusDB {e.code}: {msg}")
+
+
+def get(key: str):
+    r = _req("GET", "/" + urllib.parse.quote(key, safe=""))
+    return None if r is None else json.loads(r["value"])
+
+
+def set(key: str, value):
+    return _req("PUT", "/" + urllib.parse.quote(key, safe=""), {"value": json.dumps(value)})
+
+
+def delete(key: str) -> bool:
+    r = _req("DELETE", "/" + urllib.parse.quote(key, safe=""))
+    return bool(r and r.get("deleted"))
+
+
+def list(prefix: str = "", limit: int = 100, offset: int = 0):
+    qs = urllib.parse.urlencode({"prefix": prefix, "limit": limit, "offset": offset})
+    r = _req("GET", "?" + qs)
+    return {
+        "entries": [
+            {"key": e["key"], "value": json.loads(e["value"]), "updatedAt": e["updatedAt"]}
+            for e in r["entries"]
+        ],
+        "total": r["total"],
+    }
+`;
+
+function ensureKvHelpers(bot: BotRecord): void {
+  const dir = getBotDir(bot.id);
+  try {
+    if (bot.language === "javascript") {
+      const p = join(dir, "nexusdb.js");
+      if (!existsSync(p)) writeFileSync(p, NEXUSDB_JS, "utf-8");
+    } else {
+      const p = join(dir, "nexusdb.py");
+      if (!existsSync(p)) writeFileSync(p, NEXUSDB_PY, "utf-8");
+    }
+  } catch (err) {
+    logger.warn({ err, botId: bot.id }, "Failed to write NexusDB helper");
+  }
+}
+
 /* ── List installed packages in a bot dir ────────────────────────────────── */
 
 export function listInstalledPackages(botId: string, language: BotLanguage): string[] {
@@ -281,6 +448,8 @@ export function registerBot(
   } else {
     ensureRequirementsTxt(bot);
   }
+  ensureBotKvToken(bot.id);
+  ensureKvHelpers(bot);
 
   // For static web projects, ensure an index.html so the iframe preview works
   if (isWebProject(projectType) && !filename.endsWith(".html")) {
@@ -324,6 +493,12 @@ export function deleteBot(id: string): boolean {
   saveBots(bots);
   runtimeStates.delete(id);
   logSubscribers.delete(id);
+  deleteBotKvToken(id);
+  try { kvClose(id); } catch { /* ignore */ }
+  try {
+    const dbFile = kvDbPath(id);
+    if (existsSync(dbFile)) rmSync(dbFile, { force: true });
+  } catch { /* ignore */ }
   logger.info({ botId: id }, "Bot deleted");
   return true;
 }
@@ -435,6 +610,8 @@ function spawnBotProcess(bot: BotRecord, bots: BotRecord[]) {
 
   const botDir = getBotDir(bot.id);
   const botEnv = getBotEnv(bot.id);
+  const kvToken = ensureBotKvToken(bot.id);
+  ensureKvHelpers(bot);
 
   const isJs = bot.language === "javascript";
   const cmd = isJs ? "node" : "python3";
@@ -451,6 +628,8 @@ function spawnBotProcess(bot: BotRecord, bots: BotRecord[]) {
       NODE_PATH: join(botDir, "node_modules"),
       PYTHONPATH: join(botDir, "site-packages"),
       PYTHONUNBUFFERED: "1",
+      BOT_KV_URL: getKvBaseUrl(bot.id),
+      BOT_KV_TOKEN: kvToken,
     },
   });
 
