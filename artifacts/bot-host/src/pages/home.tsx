@@ -80,16 +80,17 @@ export default function Home() {
           </Link>
 
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Link href={`${base}/pricing`} style={{ padding: "7px 14px", fontSize: 14, fontWeight: 500, color: R.muted, textDecoration: "none", borderRadius: 8 }}>
+            <Link href={`${base}/pricing`} className="hidden sm:block" style={{ padding: "7px 14px", fontSize: 14, fontWeight: 500, color: R.muted, textDecoration: "none", borderRadius: 8 }}>
               {t("nav.pricing")}
             </Link>
-            <Link href={`${base}/sign-in`} style={{ padding: "7px 14px", fontSize: 14, fontWeight: 500, color: R.text, textDecoration: "none", borderRadius: 8 }}>
+            <Link href={`${base}/sign-in`} className="hidden sm:block" style={{ padding: "7px 14px", fontSize: 14, fontWeight: 500, color: R.text, textDecoration: "none", borderRadius: 8 }}>
               {t("nav.signIn")}
             </Link>
             <Link href={`${base}/sign-up`} style={{
-              padding: "7px 18px", fontSize: 14, fontWeight: 600,
+              padding: "7px 14px", fontSize: 14, fontWeight: 600,
               color: R.orange, textDecoration: "none",
               border: `1.5px solid ${R.orange}`, borderRadius: 99,
+              whiteSpace: "nowrap",
             }}>
               {t("nav.signUp")}
             </Link>

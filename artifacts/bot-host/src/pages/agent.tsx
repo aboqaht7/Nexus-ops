@@ -76,6 +76,8 @@ import {
   PlusCircle,
   ToggleLeft,
   ToggleRight,
+  Menu,
+  PanelRight,
 } from "lucide-react";
 import Editor from "@monaco-editor/react";
 import { useToast } from "@/hooks/use-toast";
@@ -750,6 +752,10 @@ export default function AgentPage() {
   const [newCronExpr, setNewCronExpr] = useState("0 * * * *");
   const [newCronLabel, setNewCronLabel] = useState("");
   const [cronSaving, setCronSaving] = useState(false);
+
+  /* ── Mobile panel toggles ────────────────────────────────────────────── */
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [rightPanelOpen, setRightPanelOpen] = useState(false);
 
   /* ── KV store ───────────────────────────────────────────────────────── */
   const [kvEntries, setKvEntries] = useState<Array<{ key: string; value: string; updatedAt: number }>>([]);
@@ -1488,8 +1494,28 @@ export default function AgentPage() {
 
   return (
     <Layout>
-      <div className="flex gap-0 -mx-4 -my-8 h-[calc(100vh-4rem)]">
-        <div className="w-64 border-r border-border/50 flex flex-col bg-muted/20">
+      <div className="relative flex gap-0 -mx-4 -my-8 h-[calc(100vh-4rem)] overflow-hidden">
+
+        {/* Mobile backdrop overlays */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/50 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+        {rightPanelOpen && showRightPanel && (
+          <div
+            className="fixed inset-0 z-40 bg-black/50 md:hidden"
+            onClick={() => setRightPanelOpen(false)}
+          />
+        )}
+
+        {/* ── Left sidebar ─────────────────────────────────────────── */}
+        <div className={cn(
+          "w-64 border-r border-border/50 flex-col bg-muted/20 bg-background flex-shrink-0",
+          "hidden md:flex",
+          sidebarOpen && "max-md:fixed max-md:inset-y-0 max-md:start-0 max-md:z-50 max-md:flex max-md:shadow-2xl max-md:w-72"
+        )}>
           <div className="p-4 border-b border-border/50">
             <Button
               className="w-full"
@@ -1546,6 +1572,30 @@ export default function AgentPage() {
         </div>
 
         <div className="flex-1 flex flex-col min-h-0">
+
+          {/* ── Mobile top bar ─────────────────────────────────────── */}
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-background/80 md:hidden flex-shrink-0">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-2 rounded-md hover:bg-muted/50 text-muted-foreground transition-colors"
+              aria-label="فتح القائمة"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+            <span className="flex-1 text-sm font-medium truncate text-foreground">
+              {activeConv?.title ?? "Agent-4"}
+            </span>
+            {showRightPanel && (
+              <button
+                onClick={() => setRightPanelOpen(true)}
+                className="p-2 rounded-md hover:bg-muted/50 text-muted-foreground transition-colors"
+                aria-label="فتح لوحة الأدوات"
+              >
+                <PanelRight className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
           {!activeConvId ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-6 px-8">
               <div className="text-center space-y-3">
@@ -1757,8 +1807,21 @@ export default function AgentPage() {
         </div>
 
         {showRightPanel && linkedBotForPanel && (
-          <div className="w-80 border-l border-border/50 flex flex-col bg-muted/10 flex-shrink-0">
+          <div className={cn(
+            "w-80 border-l border-border/50 flex-col bg-muted/10 bg-background flex-shrink-0",
+            "hidden md:flex",
+            rightPanelOpen && "max-md:fixed max-md:inset-y-0 max-md:end-0 max-md:z-50 max-md:flex max-md:shadow-2xl max-md:w-80"
+          )}>
             <div className="flex border-b border-border/50 bg-background/50">
+              {/* Mobile close button */}
+              <button
+                type="button"
+                onClick={() => setRightPanelOpen(false)}
+                className="md:hidden px-3 py-2.5 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                aria-label="إغلاق"
+              >
+                <X className="w-4 h-4" />
+              </button>
               <button
                 type="button"
                 onClick={() => setRightTab("files")}
