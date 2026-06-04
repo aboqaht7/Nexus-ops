@@ -72,6 +72,10 @@ import {
   Tablet,
   Monitor,
   Database,
+  Clock,
+  PlusCircle,
+  ToggleLeft,
+  ToggleRight,
 } from "lucide-react";
 import Editor from "@monaco-editor/react";
 import { useToast } from "@/hooks/use-toast";
@@ -702,7 +706,7 @@ export default function AgentPage() {
   const [streamingEvents, setStreamingEvents] = useState<StreamEvent[]>([]);
 
   /* ── Right panel: files + logs + secrets + checkpoints + preview ───── */
-  const [rightTab, setRightTab] = useState<"files" | "logs" | "secrets" | "checkpoints" | "preview" | "kv">("files");
+  const [rightTab, setRightTab] = useState<"files" | "logs" | "secrets" | "checkpoints" | "preview" | "kv" | "cron">("files");
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
   const [previewKey, setPreviewKey] = useState(0);
   const [fileTree, setFileTree] = useState<TreeNode[]>([]);
@@ -737,6 +741,15 @@ export default function AgentPage() {
 
   /* ── Cost / usage ───────────────────────────────────────────────────── */
   const [usage, setUsage] = useState<{ inputTokens: number; outputTokens: number; costSar: number; costUsd: number } | null>(null);
+
+  /* ── Cron schedules ─────────────────────────────────────────────────── */
+  interface CronSchedule { id: number; botId: string; cronExpression: string; label: string; enabled: boolean; lastRunAt: string | null; lastRunStatus: string | null; createdAt: string; }
+  const [schedules, setSchedules] = useState<CronSchedule[]>([]);
+  const [cronLoading, setCronLoading] = useState(false);
+  const [cronError, setCronError] = useState<string | null>(null);
+  const [newCronExpr, setNewCronExpr] = useState("0 * * * *");
+  const [newCronLabel, setNewCronLabel] = useState("");
+  const [cronSaving, setCronSaving] = useState(false);
 
   /* ── KV store ───────────────────────────────────────────────────────── */
   const [kvEntries, setKvEntries] = useState<Array<{ key: string; value: string; updatedAt: number }>>([]);
@@ -1062,12 +1075,77 @@ export default function AgentPage() {
     } catch { /* ignore */ }
   }, [linkedBotId, kvPrefix, fetchKv]);
 
+  const fetchSchedules = useCallback(async (botId: string) => {
+    setCronLoading(true);
+    setCronError(null);
+    try {
+      const res = await fetch(`/api/bots/${botId}/schedules`, { credentials: "include" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setSchedules(await res.json());
+    } catch (err) {
+      setCronError((err as Error).message);
+      setSchedules([]);
+    } finally {
+      setCronLoading(false);
+    }
+  }, []);
+
+  const handleAddSchedule = useCallback(async () => {
+    if (!linkedBotId || !newCronExpr.trim()) return;
+    setCronSaving(true);
+    setCronError(null);
+    try {
+      const res = await fetch(`/api/bots/${linkedBotId}/schedules`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ cronExpression: newCronExpr.trim(), label: newCronLabel.trim() || undefined }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(j.error || `HTTP ${res.status}`);
+      }
+      setNewCronExpr("0 * * * *");
+      setNewCronLabel("");
+      void fetchSchedules(linkedBotId);
+    } catch (err) {
+      setCronError((err as Error).message);
+    } finally {
+      setCronSaving(false);
+    }
+  }, [linkedBotId, newCronExpr, newCronLabel, fetchSchedules]);
+
+  const handleToggleSchedule = useCallback(async (sid: number, enabled: boolean) => {
+    if (!linkedBotId) return;
+    try {
+      await fetch(`/api/bots/${linkedBotId}/schedules/${sid}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      void fetchSchedules(linkedBotId);
+    } catch { /* ignore */ }
+  }, [linkedBotId, fetchSchedules]);
+
+  const handleDeleteSchedule = useCallback(async (sid: number) => {
+    if (!linkedBotId) return;
+    try {
+      await fetch(`/api/bots/${linkedBotId}/schedules/${sid}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      void fetchSchedules(linkedBotId);
+    } catch { /* ignore */ }
+  }, [linkedBotId, fetchSchedules]);
+
   useEffect(() => {
     if (!linkedBotId) return;
     if (rightTab === "secrets") void fetchSecrets(linkedBotId);
     if (rightTab === "checkpoints") void fetchCheckpoints(linkedBotId);
     if (rightTab === "kv") void fetchKv(linkedBotId, kvPrefix);
-  }, [rightTab, linkedBotId, fetchSecrets, fetchCheckpoints, fetchKv, kvPrefix]);
+    if (rightTab === "cron") void fetchSchedules(linkedBotId);
+  }, [rightTab, linkedBotId, fetchSecrets, fetchCheckpoints, fetchKv, kvPrefix, fetchSchedules]);
 
   // Sync editor when the user switches files (always reset on path change).
   // When fileContent updates while user is editing the SAME file, preserve their edits.
@@ -1756,6 +1834,23 @@ export default function AgentPage() {
                   <span className="text-[10px] text-muted-foreground/60">({kvTotal})</span>
                 )}
               </button>
+              <button
+                type="button"
+                onClick={() => setRightTab("cron")}
+                className={cn(
+                  "flex-1 px-2 py-2.5 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors",
+                  rightTab === "cron"
+                    ? "bg-background text-foreground border-b-2 border-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                title="مهام مجدوَلة"
+              >
+                <Clock className="w-3.5 h-3.5" />
+                الجدولة
+                {schedules.filter(s => s.enabled).length > 0 && (
+                  <span className="text-[10px] text-muted-foreground/60">({schedules.filter(s => s.enabled).length})</span>
+                )}
+              </button>
               {linkedBotForPanel && ["website", "game", "web-app"].includes(((linkedBotForPanel as unknown) as { projectType?: string }).projectType ?? "") && (
                 <button
                   type="button"
@@ -2195,6 +2290,122 @@ export default function AgentPage() {
                       ))}
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {rightTab === "cron" && linkedBotForPanel && (
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="px-3 py-2 border-b border-border/30 bg-background/40 flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    الجدولة التلقائية
+                  </span>
+                  {cronLoading && <RotateCw className="w-3 h-3 animate-spin text-muted-foreground" />}
+                </div>
+
+                {/* preset buttons */}
+                <div className="px-3 py-2 border-b border-border/20 flex flex-wrap gap-1">
+                  {([
+                    { label: "كل ساعة", expr: "0 * * * *" },
+                    { label: "يومياً 12 م", expr: "0 0 * * *" },
+                    { label: "أسبوعياً", expr: "0 0 * * 1" },
+                    { label: "شهرياً", expr: "0 0 1 * *" },
+                  ] as const).map(p => (
+                    <button
+                      key={p.expr}
+                      type="button"
+                      onClick={() => setNewCronExpr(p.expr)}
+                      className={cn(
+                        "text-[10px] px-2 py-0.5 rounded border transition-colors",
+                        newCronExpr === p.expr
+                          ? "border-primary/60 bg-primary/10 text-primary"
+                          : "border-border/40 text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* add new schedule */}
+                <div className="px-3 py-2 border-b border-border/20 space-y-1.5">
+                  <Input
+                    dir="ltr"
+                    value={newCronExpr}
+                    onChange={e => setNewCronExpr(e.target.value)}
+                    placeholder="0 * * * *  (cron expression)"
+                    className="h-7 text-xs font-mono"
+                  />
+                  <Input
+                    value={newCronLabel}
+                    onChange={e => setNewCronLabel(e.target.value)}
+                    placeholder="وصف المهمة (اختياري)"
+                    className="h-7 text-xs"
+                    onKeyDown={e => { if (e.key === "Enter") void handleAddSchedule(); }}
+                  />
+                  {cronError && (
+                    <p className="text-[10px] text-destructive">{cronError}</p>
+                  )}
+                  <Button
+                    size="sm"
+                    className="w-full h-7 text-xs gap-1"
+                    onClick={() => void handleAddSchedule()}
+                    disabled={cronSaving || !newCronExpr.trim()}
+                  >
+                    <PlusCircle className="w-3 h-3" />
+                    إضافة جدول
+                  </Button>
+                </div>
+
+                {/* schedule list */}
+                <div className="flex-1 overflow-y-auto">
+                  {schedules.length === 0 ? (
+                    <p className="px-3 py-6 text-xs text-muted-foreground/60 text-center">
+                      {cronLoading ? "جاري التحميل…" : "لا توجد مهام مجدوَلة بعد."}
+                    </p>
+                  ) : (
+                    <div className="py-1">
+                      {schedules.map(s => (
+                        <div key={s.id} className="flex items-start gap-2 px-3 py-2 border-b border-border/20 hover:bg-muted/30">
+                          <button
+                            type="button"
+                            title={s.enabled ? "إيقاف" : "تفعيل"}
+                            onClick={() => void handleToggleSchedule(s.id, !s.enabled)}
+                            className={cn("flex-shrink-0 mt-0.5 transition-colors", s.enabled ? "text-green-500 hover:text-muted-foreground" : "text-muted-foreground/40 hover:text-green-500")}
+                          >
+                            {s.enabled ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[11px] font-medium truncate">{s.label}</div>
+                            <div className="text-[10px] font-mono text-muted-foreground/70" dir="ltr">{s.cronExpression}</div>
+                            {s.lastRunAt && (
+                              <div className="text-[9px] text-muted-foreground/40 flex items-center gap-1">
+                                <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", s.lastRunStatus === "ok" ? "bg-green-500" : s.lastRunStatus === "skipped" ? "bg-yellow-500" : "bg-red-500")} />
+                                {new Date(s.lastRunAt).toLocaleString("ar-SA")}
+                                <span className="text-muted-foreground/30">·</span>
+                                <span>{s.lastRunStatus === "ok" ? "✓ نُفِّذ" : s.lastRunStatus === "skipped" ? "تخطّى" : "خطأ"}</span>
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteSchedule(s.id)}
+                            className="flex-shrink-0 text-muted-foreground hover:text-destructive p-1 rounded"
+                            title="حذف"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="px-3 py-2 border-t border-border/20">
+                  <p className="text-[9px] text-muted-foreground/50 leading-tight">
+                    الجدول يعمل بتوقيت الرياض (Asia/Riyadh). يبدأ البوت تلقائياً عند موعده إن كان متوقفاً.
+                  </p>
                 </div>
               </div>
             )}

@@ -5,6 +5,7 @@ import type { IncomingMessage } from "http";
 import app from "./app.js";
 import { logger } from "./lib/logger.js";
 import { resumeAllBots, getBotDir, getBot } from "./lib/bot-manager.js";
+import { initCronManager } from "./lib/cron-manager.js";
 
 const rawPort = process.env["PORT"];
 if (!rawPort) throw new Error("PORT environment variable is required");
@@ -50,7 +51,7 @@ function handleTerminalSession(ws: WebSocket, botId: string) {
       env: { ...process.env as Record<string, string>, PS1: `\\[\\033[1;33m\\]${bot.name}\\[\\033[0m\\]:\\[\\033[1;34m\\]\\w\\[\\033[0m\\]\\$ ` },
     });
 
-    ptyProcess.onData((data) => {
+    ptyProcess.onData((data: string) => {
       if (ws.readyState === ws.OPEN) ws.send(data);
     });
 
@@ -99,4 +100,5 @@ httpServer.on("error", (err) => {
 httpServer.listen(port, () => {
   logger.info({ port }, "Server listening");
   resumeAllBots();
+  void initCronManager();
 });

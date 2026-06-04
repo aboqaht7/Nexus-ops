@@ -9,6 +9,7 @@ import packagesRouter from "./packages.js";
 import subscriptionsRouter from "./subscriptions.js";
 import previewRouter from "./preview.js";
 import kvRouter from "./kv.js";
+import cronRouter from "./cron.js";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(packagesRouter);
 router.use(subscriptionsRouter);
 router.use(previewRouter);
 router.use(kvRouter);
+router.use(cronRouter);
 
 export default router;
